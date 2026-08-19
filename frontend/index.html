@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IAA Condition Monitoring — Dashboard</title>
+<meta name="description" content="Real-time condition monitoring dashboard for industrial drivetrains. Monitor vibration, temperature, RPM, ML predictions and alerts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── Design Tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg-base:        #080d1a;
+  --bg-surface:     #0e1628;
+  --bg-card:        rgba(14, 22, 40, 0.85);
+  --bg-glass:       rgba(255,255,255,0.04);
+  --bg-glass-hover: rgba(255,255,255,0.07);
+  --border:         rgba(255,255,255,0.08);
+  --border-strong:  rgba(255,255,255,0.14);
+  --text-primary:   #e8edf5;
+  --text-secondary: #8b96aa;
+  --text-muted:     #4e5a6e;
+  --accent:         #3b82f6;
+  --accent-glow:    rgba(59,130,246,0.35);
+  --accent-dim:     rgba(59,130,246,0.12);
+  --green:          #10b981;
+  --green-dim:      rgba(16,185,129,0.1);
+  --amber:          #f59e0b;
+  --amber-dim:      rgba(245,158,11,0.1);
+  --rose:           #f43f5e;
+  --rose-dim:       rgba(244,63,94,0.1);
+  --purple:         #a855f7;
+  --purple-dim:     rgba(168,85,247,0.12);
+  --cyan:           #06b6d4;
+  --sidebar-w:      240px;
+  --header-h:       64px;
+  --radius-sm:      6px;
+  --radius:         10px;
+  --radius-lg:      16px;
+  --radius-xl:      22px;
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Inter', system-ui, sans-serif; background: var(--bg-base); color: var(--text-primary); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 9px; }
+
+/* ─── Login ─── */
+#login-screen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(59,130,246,0.18) 0%, transparent 60%), radial-gradient(ellipse 60% 60% at 80% 80%, rgba(168,85,247,0.12) 0%, transparent 50%), var(--bg-base); animation: fadeIn 0.5s ease; }
+.login-card { width: 420px; max-width: 92vw; background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-xl); padding: 44px 40px; box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) inset; animation: slideUp 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+.login-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.login-logo-text { font-size: 17px; font-weight: 700; }
+.login-logo-sub  { font-size: 11px; color: var(--text-secondary); }
+.login-title { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+.login-subtitle { font-size: 13px; color: var(--text-secondary); margin-bottom: 30px; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+.form-input { width: 100%; padding: 11px 14px; background: var(--bg-glass); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: inherit; transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+.form-input::placeholder { color: var(--text-muted); }
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.role-btn { padding: 10px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-glass); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: center; }
+.role-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.role-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.role-btn .role-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+.login-btn { width: 100%; margin-top: 24px; padding: 13px; background: linear-gradient(135deg, var(--accent), #6366f1); border: none; border-radius: var(--radius-sm); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 18px rgba(59,130,246,0.4); font-family: inherit; }
+.login-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(59,130,246,0.55); }
+
+/* ─── App Shell ─── */
+#app { display: none; height: 100vh; flex-direction: column; }
+#app.visible { display: flex; animation: fadeIn 0.4s ease; }
+
+/* ─── Header ─── */
+.header { height: var(--header-h); flex-shrink: 0; background: var(--bg-surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; position: relative; z-index: 100; }
+.header-brand { display: flex; align-items: center; gap: 9px; width: var(--sidebar-w); flex-shrink: 0; }
+.header-brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.header-brand-name { font-size: 14px; font-weight: 700; }
+.header-brand-sub  { font-size: 10px; color: var(--text-secondary); }
+.header-divider { width: 1px; height: 30px; background: var(--border); flex-shrink: 0; }
+.asset-select-wrapper { position: relative; }
+.asset-select-wrapper::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 11px; pointer-events: none; }
+select.asset-select { padding: 7px 32px 7px 12px; background: var(--bg-glass); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 13px; font-weight: 500; font-family: inherit; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+.status-pill.ok    { background: var(--green-dim); color: var(--green); }
+.status-pill.warn  { background: var(--amber-dim); color: var(--amber); }
+.status-pill.alarm { background: var(--rose-dim);  color: var(--rose); animation: pulse-alarm 1s ease infinite; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.status-dot.live { animation: pulse-dot 1.5s ease infinite; }
+.header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.icon-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-glass); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: all 0.2s; position: relative; }
+.icon-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+.notif-badge { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--rose); font-size: 9px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-surface); }
+.user-chip { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border: 1px solid var(--border); border-radius: 9999px; background: var(--bg-glass); cursor: pointer; transition: all 0.2s; }
+.user-chip:hover { border-color: var(--border-strong); }
+.user-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+.user-name { font-size: 12px; font-weight: 600; }
+.user-role-tag { font-size: 10px; color: var(--text-secondary); }
+
+/* ─── App Body ─── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ─── Sidebar ─── */
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; padding: 12px 0; }
+.nav-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--text-muted); text-transform: uppercase; padding: 14px 18px 6px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; border-left: 2px solid transparent; user-select: none; }
+.nav-item:hover { color: var(--text-primary); background: var(--bg-glass-hover); }
+.nav-item.active { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
+.nav-item-icon { font-size: 16px; flex-shrink: 0; width: 20px; text-align: center; }
+.nav-item-badge { margin-left: auto; padding: 2px 7px; border-radius: 9999px; background: var(--rose); color: #fff; font-size: 10px; font-weight: 700; }
+.sidebar-footer { margin-top: auto; padding: 12px 14px; border-top: 1px solid var(--border); }
+.sidebar-footer-btn { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+.sidebar-footer-btn:hover { background: var(--bg-glass-hover); color: var(--text-primary); }
+
+/* ─── Main ─── */
+.main-content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.view { display: none; }
+.view.active { display: contents; }
+
+/* ─── Shared ─── */
+.page-title { font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+.page-title-sub { font-size: 13px; color: var(--text-secondary); font-weight: 400; margin-top: 3px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: border-color 0.2s; }
+.card:hover { border-color: var(--border-strong); }
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 0; }
+.card-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.04em; text-transform: uppercase; }
+.card-body { padding: 16px 20px 20px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* ─── KPI Cards ─── */
+.kpi-card { padding: 20px; position: relative; overflow: hidden; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.kpi-card.blue::before  { background: linear-gradient(90deg, var(--accent), var(--purple)); }
+.kpi-card.green::before { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+.kpi-card.amber::before { background: linear-gradient(90deg, var(--amber), #f97316); }
+.kpi-card.rose::before  { background: linear-gradient(90deg, var(--rose), var(--purple)); }
+.kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 10px; }
+.kpi-value { font-size: 32px; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1; margin-bottom: 6px; }
+.kpi-value .kpi-unit { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+.kpi-trend { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.kpi-trend.up { color: var(--rose); }
+.kpi-trend.down { color: var(--green); }
+.kpi-trend.neutral { color: var(--text-secondary); }
+.kpi-sparkline { height: 40px; width: 100%; margin-top: 14px; }
+.kpi-icon { position: absolute; right: 18px; top: 18px; font-size: 28px; opacity: 0.15; }
+
+/* ─── Gauge ─── */
+.gauge-wrap { display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 10px; }
+canvas.gauge { display: block; }
+.gauge-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.06em; text-transform: uppercase; }
+.gauge-value-display { font-size: 24px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+.gauge-unit-display  { font-size: 12px; color: var(--text-secondary); margin-top: -2px; text-align: center; }
+
+/* ─── Chart ─── */
+.chart-wrap { padding: 16px 20px 20px; position: relative; }
+.chart-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.chart-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; }
+.chart-legend-item:hover { background: var(--bg-glass); }
+.chart-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.time-range-btns { display: flex; gap: 4px; margin-left: auto; }
+.time-btn { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.time-btn.active, .time-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+canvas.chart-canvas { width: 100%; height: 180px; display: block; }
+
+/* ─── ML Models ─── */
+.model-tabs { display: flex; gap: 6px; padding: 16px 20px 0; flex-wrap: wrap; }
+.model-tab { padding: 7px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.model-tab.active { border-color: var(--purple); color: var(--purple); background: var(--purple-dim); }
+.model-tab:hover:not(.active) { border-color: var(--border-strong); color: var(--text-primary); }
+.model-results { padding: 16px 20px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.model-metric { background: var(--bg-glass); border-radius: var(--radius); padding: 14px 16px; }
+.model-metric-label { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 6px; }
+.model-metric-value { font-size: 22px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+.model-metric-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.rul-bar-wrap { padding: 0 20px 20px; }
+.rul-bar-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.rul-bar-track { height: 8px; background: var(--bg-glass); border-radius: 99px; overflow: hidden; }
+.rul-bar-fill { height: 100%; border-radius: 99px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); background: linear-gradient(90deg, var(--green), var(--cyan)); }
+.rul-bar-fill.medium { background: linear-gradient(90deg, var(--amber), #f97316); }
+.rul-bar-fill.low    { background: linear-gradient(90deg, var(--rose), var(--purple)); }
+.fault-tags { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 20px 16px; }
+.fault-tag { padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; border: 1px solid currentColor; }
+.fault-tag.none   { color: var(--green);  background: var(--green-dim); }
+.fault-tag.warn   { color: var(--amber);  background: var(--amber-dim); }
+.fault-tag.active { color: var(--rose);   background: var(--rose-dim); }
+
+/* ─── Alerts ─── */
+.alert-list { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 16px; }
+.alert-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-glass); transition: all 0.2s; }
+.alert-item:hover { background: var(--bg-glass-hover); }
+.alert-item.critical { border-color: var(--rose); background: var(--rose-dim); }
+.alert-item.warning  { border-color: var(--amber); background: var(--amber-dim); }
+.alert-item.info     { border-color: var(--accent); background: var(--accent-dim); }
+.alert-item.acked    { opacity: 0.5; border-color: var(--border); background: transparent; }
+.alert-sev-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.alert-body { flex: 1; }
+.alert-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.alert-desc  { font-size: 12px; color: var(--text-secondary); }
+.alert-meta  { font-size: 10px; color: var(--text-muted); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+.alert-ack-btn { padding: 5px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: transparent; color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; font-family: inherit; white-space: nowrap; align-self: flex-start; }
+.alert-ack-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+
+/* ─── Alarm Banner ─── */
+.alarm-banner { display: none; align-items: center; gap: 12px; padding: 12px 20px; background: linear-gradient(90deg, rgba(244,63,94,0.2), rgba(244,63,94,0.05)); border: 1px solid rgba(244,63,94,0.4); border-radius: var(--radius); animation: pulse-alarm 1.5s ease infinite; }
+.alarm-banner.active { display: flex; }
+.alarm-banner-text { flex: 1; font-size: 14px; font-weight: 600; color: var(--rose); }
+.alarm-banner-sub  { font-size: 12px; color: var(--text-secondary); }
+.alarm-dismiss-btn { padding: 7px 16px; border-radius: var(--radius-sm); border: 1px solid var(--rose); background: var(--rose-dim); color: var(--rose); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.alarm-dismiss-btn:hover { background: rgba(244,63,94,0.25); }
+
+/* ─── Comparison ─── */
+.comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.comparison-card { padding: 20px; }
+.comparison-asset-name { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.comparison-metric-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.comparison-metric-row:last-child { border-bottom: none; }
+.comparison-metric-name  { font-size: 12px; color: var(--text-secondary); }
+.comparison-metric-value { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.comparison-metric-bar-wrap { margin-top: 6px; height: 4px; background: var(--bg-glass); border-radius: 99px; overflow: hidden; }
+.comparison-metric-bar { height: 100%; border-radius: 99px; }
+
+/* ─── Chat ─── */
+.chat-wrap { display: flex; flex-direction: column; height: 520px; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.chat-msg { display: flex; gap: 10px; max-width: 85%; animation: slideUp 0.25s ease; }
+.chat-msg.user { flex-direction: row-reverse; margin-left: auto; }
+.chat-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+.chat-avatar.ai   { background: linear-gradient(135deg, var(--accent), var(--purple)); color: #fff; }
+.chat-avatar.user { background: var(--bg-glass); border: 1px solid var(--border-strong); }
+.chat-bubble { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; }
+.chat-bubble.ai   { background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-primary); }
+.chat-bubble.user { background: var(--accent-dim); border: 1px solid rgba(59,130,246,0.3); color: var(--text-primary); }
+.chat-time { font-size: 10px; color: var(--text-muted); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+.chat-input-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.chat-input { flex: 1; padding: 10px 14px; background: var(--bg-glass); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+.chat-input::placeholder { color: var(--text-muted); }
+.chat-input:focus { border-color: var(--accent); }
+.chat-send-btn { padding: 10px 18px; border-radius: var(--radius-sm); border: none; background: linear-gradient(135deg, var(--accent), #6366f1); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; white-space: nowrap; }
+.chat-send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
+.typing-indicator { display: flex; align-items: center; gap: 6px; padding: 8px 14px; }
+.typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); animation: typingBounce 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ─── Sensor Table ─── */
+.sensor-table { width: 100%; border-collapse: collapse; }
+.sensor-table th, .sensor-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+.sensor-table th { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.07em; text-transform: uppercase; }
+.sensor-table td { font-size: 13px; }
+.sensor-table td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.sensor-table tr:last-child td { border-bottom: none; }
+.sensor-table tr:hover td { background: var(--bg-glass); }
+.health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+/* ─── Anomaly bar ─── */
+.anomaly-bar-wrap { padding: 0 20px 16px; }
+.anomaly-bar-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+.anomaly-bar-track { height: 12px; background: var(--bg-glass); border-radius: 99px; overflow: hidden; position: relative; }
+.anomaly-bar-fill  { height: 100%; border-radius: 99px; transition: width 1s ease; }
+.anomaly-threshold { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--amber); }
+
+/* ─── Badge / utility ─── */
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; border: 1px solid currentColor; }
+.badge.green  { color: var(--green); background: var(--green-dim); }
+.badge.amber  { color: var(--amber); background: var(--amber-dim); }
+.badge.rose   { color: var(--rose);  background: var(--rose-dim); }
+.badge.blue   { color: var(--accent); background: var(--accent-dim); }
+.overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.chart-row     { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+
+/* ─── Toast ─── */
+#toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 12px 18px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--bg-surface); box-shadow: 0 8px 32px rgba(0,0,0,0.5); font-size: 13px; font-weight: 500; animation: slideInRight 0.3s ease; display: flex; align-items: center; gap: 10px; max-width: 320px; }
+.toast.success { border-color: var(--green); }
+.toast.warning { border-color: var(--amber); }
+.toast.error   { border-color: var(--rose); }
+
+/* ─── Animations ─── */
+@keyframes fadeIn        { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp       { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-dot     { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.7); } }
+@keyframes pulse-alarm   { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 16px rgba(244,63,94,0.4); } }
+@keyframes typingBounce  { 0%,80%,100% { transform: scale(0.7); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+@keyframes slideInRight  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">⚙️</div>
+      <div>
+        <div class="login-logo-text">IAA Condition Monitor</div>
+        <div class="login-logo-sub">Industrial Analytics &amp; Automation</div>
+      </div>
+    </div>
+    <div class="login-title">Welcome back</div>
+    <div class="login-subtitle">Sign in to access the monitoring dashboard</div>
+    <div class="form-group">
+      <label class="form-label">Email address</label>
+      <input class="form-input" type="email" id="login-email" placeholder="you@iaa.de" value="researcher@iaa.de">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" type="password" id="login-password" placeholder="••••••••" value="••••••••">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Access Role</label>
+      <div class="role-grid" id="role-grid">
+        <div class="role-btn" data-role="operator"><span class="role-icon">🔧</span>Operator</div>
+        <div class="role-btn active" data-role="researcher"><span class="role-icon">🔬</span>Researcher</div>
+        <div class="role-btn" data-role="supervisor"><span class="role-icon">📊</span>Supervisor</div>
+        <div class="role-btn" data-role="admin"><span class="role-icon">🛡️</span>Admin</div>
+      </div>
+    </div>
+    <button class="login-btn" id="login-btn">Sign In →</button>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-brand-icon">⚙️</div>
+      <div>
+        <div class="header-brand-name">IAA Monitor</div>
+        <div class="header-brand-sub">Real-time Condition Monitoring</div>
+      </div>
+    </div>
+    <div class="header-divider"></div>
+    <div style="display:flex;align-items:center;gap:10px;flex:1">
+      <div class="asset-select-wrapper">
+        <select class="asset-select" id="asset-select">
+          <option value="test-rig-a">Test Rig A — Drive Train</option>
+          <option value="test-rig-b">Test Rig B — Bearing Unit</option>
+          <option value="motor-01">Motor 01 — Induction (15 kW)</option>
+          <option value="gearbox-02">Gearbox 02 — Helical Stage</option>
+        </select>
+      </div>
+      <div class="status-pill ok" id="asset-status-pill">
+        <div class="status-dot live"></div>
+        <span id="asset-status-text">Nominal</span>
+      </div>
+      <div class="status-pill" style="background:rgba(6,182,212,0.1);color:var(--cyan);font-size:11px;padding:4px 10px;">
+        <div class="status-dot" style="background:var(--cyan);animation:pulse-dot 1s infinite;"></div>Live
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="icon-btn" id="alarm-toggle-btn" title="Toggle alarm">🔔<div class="notif-badge" id="alert-count-badge">3</div></div>
+      <div class="icon-btn" id="fullscreen-btn" title="Fullscreen">⛶</div>
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar" style="background:linear-gradient(135deg,var(--accent),var(--purple))">R</div>
+        <div>
+          <div class="user-name" id="user-name-display">A. Researcher</div>
+          <div class="user-role-tag" id="user-role-display">Researcher</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+      <div class="nav-section-label">Monitoring</div>
+      <div class="nav-item active" data-view="overview"><span class="nav-item-icon">🏠</span>Overview</div>
+      <div class="nav-item" data-view="realtime"><span class="nav-item-icon">📡</span>Real-Time</div>
+      <div class="nav-item" data-view="historical"><span class="nav-item-icon">📈</span>Historical Trends</div>
+      <div class="nav-section-label">Analytics</div>
+      <div class="nav-item" data-view="ml-models"><span class="nav-item-icon">🤖</span>ML Predictions</div>
+      <div class="nav-item" data-view="alerts"><span class="nav-item-icon">🚨</span>Alerts<span class="nav-item-badge" id="nav-alert-badge">3</span></div>
+      <div class="nav-item" data-view="comparison"><span class="nav-item-icon">⚖️</span>Asset Comparison</div>
+      <div class="nav-section-label">Assistant</div>
+      <div class="nav-item" data-view="ai-assistant"><span class="nav-item-icon">💬</span>AI Assistant</div>
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-btn" id="logout-btn">🚪 Sign Out</div>
+      </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+      <!-- ░ OVERVIEW ░ -->
+      <div class="view active" id="view-overview">
+        <div class="alarm-banner" id="alarm-banner">
+          <span style="font-size:22px;">🚨</span>
+          <div>
+            <div class="alarm-banner-text">CRITICAL ALARM — High Vibration Detected</div>
+            <div class="alarm-banner-sub">Sensor: Drive-End Bearing (X-axis) · Value: 12.4 mm/s RMS · Threshold: 8.0 mm/s</div>
+          </div>
+          <button class="alarm-dismiss-btn" id="alarm-dismiss-btn">Acknowledge</button>
+        </div>
+
+        <div>
+          <div class="page-title">🏠 Overview <span class="badge blue" style="font-size:11px;font-weight:500">Live</span></div>
+          <div class="page-title-sub" id="overview-subtitle">Test Rig A — Drive Train · Last updated just now</div>
+        </div>
+
+        <div class="overview-grid">
+          <div class="card kpi-card blue">
+            <div class="kpi-icon">〰️</div>
+            <div class="kpi-label">Vibration RMS</div>
+            <div class="kpi-value"><span id="kpi-vib">3.42</span><span class="kpi-unit">mm/s</span></div>
+            <div class="kpi-trend up" id="kpi-vib-trend">↑ +0.18 from last hour</div>
+            <canvas class="kpi-sparkline" id="spark-vib"></canvas>
+          </div>
+          <div class="card kpi-card green">
+            <div class="kpi-icon">🌡️</div>
+            <div class="kpi-label">Bearing Temp</div>
+            <div class="kpi-value"><span id="kpi-temp">62.1</span><span class="kpi-unit">°C</span></div>
+            <div class="kpi-trend neutral">→ Stable for 14 min</div>
+            <canvas class="kpi-sparkline" id="spark-temp"></canvas>
+          </div>
+          <div class="card kpi-card amber">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-label">Shaft Speed</div>
+            <div class="kpi-value"><span id="kpi-rpm">1482</span><span class="kpi-unit">RPM</span></div>
+            <div class="kpi-trend neutral">→ Within setpoint ±5</div>
+            <canvas class="kpi-sparkline" id="spark-rpm"></canvas>
+          </div>
+          <div class="card kpi-card rose">
+            <div class="kpi-icon">📊</div>
+            <div class="kpi-label">Anomaly Score</div>
+            <div class="kpi-value"><span id="kpi-anomaly">0.23</span><span class="kpi-unit">/1.0</span></div>
+            <div class="kpi-trend down">↓ Low risk</div>
+            <canvas class="kpi-sparkline" id="spark-anomaly"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-row">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Live Trend — Vibration &amp; Temperature</div>
+              <div class="time-range-btns">
+                <button class="time-btn active">5m</button>
+                <button class="time-btn">30m</button>
+                <button class="time-btn">1h</button>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-toolbar">
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--accent)"></div>Vibration (mm/s)</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--green)"></div>Temp (°C ×0.1)</div>
+                <div class="chart-legend-item"><div class="chart-legend-dot" style="background:rgba(244,63,94,0.6)"></div>Alert threshold</div>
+              </div>
+              <canvas class="chart-canvas" id="main-chart" height="180"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header" style="padding-bottom:12px;">
+              <div class="card-title">Recent Alerts</div>
+              <div class="badge rose">3 Active</div>
+            </div>
+            <div class="alert-list" id="recent-alerts-list"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header" style="padding-bottom:12px;">
+            <div class="card-title">Sensor Status Summary</div>
+            <div style="font-size:11px;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;" id="table-last-updated">Updated: --:--:--</div>
+          </div>
+          <div class="card-body" style="padding-top:0;">
+            <table class="sensor-table">
+              <thead><tr><th>Sensor</th><th>Channel</th><th>Value</th><th>Unit</th><th>Status</th><th>Last seen</th></tr></thead>
+              <tbody id="sensor-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /overview -->
+
+
+      <!-- ░ REAL-TIME ░ -->
+      <div class="view" id="view-realtime">
+        <div>
+          <div class="page-title">📡 Real-Time Monitoring</div>
+          <div class="page-title-sub">Live sensor gauges updating every second</div>
+        </div>
+        <div class="grid-3">
+          <div class="card gauge-wrap">
+            <canvas class="gauge" id="gauge-vib" width="180" height="110"></canvas>
+            <div class="gauge-value-display" id="gauge-vib-val" style="color:var(--accent)">3.42</div>
+            <div class="gauge-unit-display">mm/s RMS</div>
+            <div class="gauge-label">VIBRATION (Drive-End X)</div>
+          </div>
+          <div class="card gauge-wrap">
+            <canvas class="gauge" id="gauge-temp" width="180" height="110"></canvas>
+            <div class="gauge-value-display" id="gauge-temp-val" style="color:var(--green)">62.1</div>
+            <div class="gauge-unit-display">°C</div>
+            <div class="gauge-label">BEARING TEMPERATURE</div>
+          </div>
+          <div class="card gauge-wrap">
+            <canvas class="gauge" id="gauge-rpm" width="180" height="110"></canvas>
+            <div class="gauge-value-display" id="gauge-rpm-val" style="color:var(--amber)">1482</div>
+            <div class="gauge-unit-display">RPM</div>
+            <div class="gauge-label">SHAFT SPEED</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Real-Time Multi-Channel Feed</div>
+            <div style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:5px;"><div class="status-dot live" style="background:var(--green)"></div>Streaming at 1 Hz</div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-toolbar">
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--accent)"></div>Vibration X</div>
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--cyan)"></div>Vibration Y</div>
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--green)"></div>Temperature</div>
+              <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--amber)"></div>RPM (scaled)</div>
+            </div>
+            <canvas class="chart-canvas" id="realtime-chart" height="200"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Frequency Spectrum (FFT)</div>
+            <div class="badge blue">Live</div>
+          </div>
+          <div class="chart-wrap">
+            <canvas class="chart-canvas" id="fft-chart" height="140"></canvas>
+          </div>
+        </div>
+      </div><!-- /realtime -->
+
+
+      <!-- ░ HISTORICAL ░ -->
+      <div class="view" id="view-historical">
+        <div>
+          <div class="page-title">📈 Historical Trends</div>
+          <div class="page-title-sub">Long-range time series analysis and anomaly timeline</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Vibration RMS — 7-Day History</div>
+            <div class="time-range-btns">
+              <button class="time-btn">1D</button>
+              <button class="time-btn active">7D</button>
+              <button class="time-btn">30D</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas class="chart-canvas" id="hist-vib-chart" height="200"></canvas></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Bearing Temperature History</div></div>
+            <div class="chart-wrap"><canvas class="chart-canvas" id="hist-temp-chart" height="160"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">RPM &amp; Load Trend</div></div>
+            <div class="chart-wrap"><canvas class="chart-canvas" id="hist-rpm-chart" height="160"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header" style="padding-bottom:12px;"><div class="card-title">Anomaly Event Timeline</div></div>
+          <div class="card-body" style="padding-top:0;"><div id="anomaly-timeline"></div></div>
+        </div>
+      </div><!-- /historical -->
+
+
+      <!-- ░ ML MODELS ░ -->
+      <div class="view" id="view-ml-models">
+        <div>
+          <div class="page-title">🤖 ML Predictions</div>
+          <div class="page-title-sub">Anomaly detection and remaining useful life estimation</div>
+        </div>
+        <div class="card">
+          <div class="model-tabs" id="model-tabs">
+            <button class="model-tab active" data-model="lstm">LSTM Autoencoder</button>
+            <button class="model-tab" data-model="rf">Random Forest</button>
+            <button class="model-tab" data-model="xgb">XGBoost</button>
+            <button class="model-tab" data-model="cnn">1D-CNN</button>
+          </div>
+          <div class="model-results" id="model-results"></div>
+          <div class="anomaly-bar-wrap">
+            <div class="anomaly-bar-header">
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Anomaly Score</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;" id="anomaly-score-text">0.23 / 1.00</span>
+            </div>
+            <div class="anomaly-bar-track">
+              <div class="anomaly-bar-fill" id="anomaly-bar-fill" style="width:23%"></div>
+              <div class="anomaly-threshold" style="left:70%;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--text-muted);">
+              <span>0</span><span>Threshold: 0.70</span><span>1.0</span>
+            </div>
+          </div>
+          <div class="rul-bar-wrap">
+            <div class="rul-bar-label">
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Remaining Useful Life</span>
+              <strong id="rul-value-text">78% — ~312 hours</strong>
+            </div>
+            <div class="rul-bar-track"><div class="rul-bar-fill" id="rul-bar-fill" style="width:78%"></div></div>
+          </div>
+          <div class="fault-tags" id="fault-tags"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Model Confidence — Last 24 Hours</div></div>
+          <div class="chart-wrap"><canvas class="chart-canvas" id="confidence-chart" height="180"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header" style="padding-bottom:12px;"><div class="card-title">Model Performance Comparison</div></div>
+          <div class="card-body" style="padding-top:0;">
+            <table class="sensor-table">
+              <thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>Latency</th><th>Status</th></tr></thead>
+              <tbody id="model-compare-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /ml-models -->
+
+
+      <!-- ░ ALERTS ░ -->
+      <div class="view" id="view-alerts">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="page-title">🚨 Alerts &amp; Alarms</div>
+            <div class="page-title-sub">Active anomaly detections requiring attention</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="badge rose" id="active-alert-count">3 Active</div>
+            <button id="ack-all-btn" style="padding:7px 14px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Acknowledge All</button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="padding:16px 16px 0;display:flex;gap:6px;flex-wrap:wrap;" id="alert-filter-tabs">
+            <button class="time-btn active" data-filter="all">All</button>
+            <button class="time-btn" data-filter="critical">Critical</button>
+            <button class="time-btn" data-filter="warning">Warning</button>
+            <button class="time-btn" data-filter="info">Info</button>
+            <button class="time-btn" data-filter="acked">Acknowledged</button>
+          </div>
+          <div class="alert-list" id="full-alert-list" style="padding:16px;"></div>
+        </div>
+      </div><!-- /alerts -->
+
+
+      <!-- ░ COMPARISON ░ -->
+      <div class="view" id="view-comparison">
+        <div>
+          <div class="page-title">⚖️ Asset Comparison</div>
+          <div class="page-title-sub">Side-by-side live metrics for multiple machines</div>
+        </div>
+        <div class="comparison-grid" id="comparison-grid"></div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Comparative Vibration Trend — All Assets</div></div>
+          <div class="chart-wrap"><canvas class="chart-canvas" id="compare-chart" height="200"></canvas></div>
+        </div>
+      </div><!-- /comparison -->
+
+
+      <!-- ░ AI ASSISTANT ░ -->
+      <div class="view" id="view-ai-assistant">
+        <div>
+          <div class="page-title">💬 AI Diagnostic Assistant</div>
+          <div class="page-title-sub">Ask questions about machine health, alerts, and sensor readings</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="time-btn" data-prompt="What is the current health status of the asset?">🏥 Health status</button>
+          <button class="time-btn" data-prompt="Explain the latest vibration anomaly detected.">〰️ Explain anomaly</button>
+          <button class="time-btn" data-prompt="How much remaining useful life does the bearing have?">⏳ RUL estimate</button>
+          <button class="time-btn" data-prompt="What maintenance actions do you recommend?">🔧 Recommendations</button>
+          <button class="time-btn" data-prompt="Compare vibration trends between Test Rig A and Motor 01.">⚖️ Compare assets</button>
+        </div>
+        <div class="card chat-wrap">
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-row">
+            <input class="chat-input" id="chat-input" type="text" placeholder="Ask about machine health, anomalies, or sensor readings…" autocomplete="off">
+            <button class="chat-send-btn" id="chat-send-btn">Send →</button>
+          </div>
+        </div>
+      </div><!-- /ai-assistant -->
+
+    </main>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+'use strict';
+
+/* ═══ STATE ═══ */
+const State = {
+  role: 'researcher', asset: 'test-rig-a', activeView: 'overview',
+  alarmActive: false, ticks: 0,
+  history: { vib: [], temp: [], rpm: [], anomaly: [] },
+  model: 'lstm',
+};
+
+const ASSETS = {
+  'test-rig-a': { name: 'Test Rig A',  label: 'Drive Train',       basevib: 3.4,  basetemp: 62,  baserpm: 1482 },
+  'test-rig-b': { name: 'Test Rig B',  label: 'Bearing Unit',      basevib: 2.1,  basetemp: 55,  baserpm: 1200 },
+  'motor-01':   { name: 'Motor 01',    label: 'Induction 15 kW',   basevib: 1.8,  basetemp: 70,  baserpm: 2950 },
+  'gearbox-02': { name: 'Gearbox 02', label: 'Helical Stage',      basevib: 4.9,  basetemp: 75,  baserpm:  960 },
+};
+
+const ML_MODELS = {
+  lstm: { label:'LSTM Autoencoder', accuracy:94.2, precision:92.8, recall:95.1, f1:93.9, latency:'28ms', anomalyScore:0.23, rul:78,
+    faults:[{label:'Imbalance',state:'none'},{label:'Misalignment',state:'none'},{label:'Bearing Defect',state:'warn'},{label:'Looseness',state:'none'}] },
+  rf:   { label:'Random Forest',    accuracy:91.7, precision:90.4, recall:92.3, f1:91.3, latency:'8ms',  anomalyScore:0.31, rul:74,
+    faults:[{label:'Imbalance',state:'none'},{label:'Misalignment',state:'warn'},{label:'Bearing Defect',state:'warn'},{label:'Looseness',state:'none'}] },
+  xgb:  { label:'XGBoost',          accuracy:93.1, precision:91.9, recall:94.0, f1:92.9, latency:'12ms', anomalyScore:0.28, rul:76,
+    faults:[{label:'Imbalance',state:'none'},{label:'Misalignment',state:'none'},{label:'Bearing Defect',state:'active'},{label:'Looseness',state:'none'}] },
+  cnn:  { label:'1D-CNN',           accuracy:95.6, precision:94.3, recall:96.1, f1:95.2, latency:'45ms', anomalyScore:0.19, rul:81,
+    faults:[{label:'Imbalance',state:'none'},{label:'Misalignment',state:'none'},{label:'Bearing Defect',state:'none'},{label:'Looseness',state:'none'}] },
+};
+
+const ALERT_DATA = [
+  {id:1, sev:'critical', title:'High Vibration — Drive End',       desc:'Vibration RMS exceeded 8.0 mm/s. Bearing defect suspected.', asset:'test-rig-a', time:'2026-08-17 23:21:04', acked:false},
+  {id:2, sev:'warning',  title:'Bearing Temperature Rising',        desc:'DE Bearing temp trending +2.3 °C over 30 min.',             asset:'test-rig-a', time:'2026-08-17 22:58:11', acked:false},
+  {id:3, sev:'warning',  title:'RPM Fluctuation Detected',          desc:'Shaft speed variance ±18 RPM above ±5 RPM tolerance.',      asset:'motor-01',   time:'2026-08-17 22:40:33', acked:false},
+  {id:4, sev:'info',     title:'Scheduled Maintenance Due',         desc:'Lubricant change interval (500 h) reached — Gearbox 02.',   asset:'gearbox-02', time:'2026-08-17 21:00:00', acked:false},
+  {id:5, sev:'info',     title:'ML Model Retrained',                desc:'LSTM retrained on latest 7-day data. F1: 0.93 → 0.94.',     asset:'all',        time:'2026-08-17 20:00:00', acked:true},
+];
+
+const ANOMALY_EVENTS = [
+  {ts:'2026-08-17 23:21', sev:'critical', msg:'Vibration spike (12.4 mm/s) — possible outer race defect', model:'XGBoost + LSTM'},
+  {ts:'2026-08-17 22:58', sev:'warning',  msg:'Bearing temp 64.2 °C (+2.3 °C drift over 30 min)',         model:'Threshold rule'},
+  {ts:'2026-08-17 18:35', sev:'warning',  msg:'Anomaly score 0.68 — approaching alert threshold',          model:'LSTM Autoencoder'},
+  {ts:'2026-08-16 09:12', sev:'info',     msg:'Mild imbalance signature in FFT at 24.7 Hz',                model:'1D-CNN'},
+  {ts:'2026-08-14 14:52', sev:'info',     msg:'Motor temperature 71.8 °C — within limits, noted',          model:'Threshold rule'},
+];
+
+const AI_ANSWERS = {
+  health:      `📊 **Current Health — Test Rig A**\n\nOverall status: **Caution ⚠️**\n\n• **Vibration RMS**: 3.42 mm/s — within normal range but trending upward.\n• **Bearing Temp**: 62.1 °C — elevated; monitor for rise above 70 °C.\n• **Shaft Speed**: 1,482 RPM — stable within ±5 RPM.\n• **Anomaly Score**: 0.23 — low risk; early bearing-defect signature detected.\n\n**Recommendation**: Schedule inspection of the drive-end bearing within the next 50 operating hours.`,
+  anomaly:     `〰️ **Latest Vibration Anomaly Explained**\n\nAt **23:21 UTC** the drive-end accelerometer recorded a peak of **12.4 mm/s RMS**, exceeding the 8.0 mm/s threshold.\n\n**Root cause (XGBoost + LSTM consensus)**:\n• Outer race bearing defect — BPFO frequency elevated +6.2 dB at 87.4 Hz.\n• Pattern consistent with early-stage spalling on outer raceway.\n• Score returned to baseline within 4 minutes — intermittent contact.`,
+  rul:         `⏳ **Remaining Useful Life — Drive-End Bearing**\n\n| Model | RUL | Confidence |\n|---|---|---|\n| LSTM Autoencoder | 312 h (78%) | High |\n| Random Forest | 296 h (74%) | Medium |\n| XGBoost | 304 h (76%) | High |\n| 1D-CNN | 324 h (81%) | High |\n\n**Ensemble estimate**: ~310 operating hours.\nAt current utilisation (8 h/day) → approx. **39 working days** before bearing replacement.`,
+  maintenance: `🔧 **Maintenance Recommendations**\n\n**Priority 1 — Urgent (within 50 h)**\n• Inspect drive-end bearing for spalling on outer race.\n• Check and replenish lubricant if degraded.\n\n**Priority 2 — Planned (within 200 h)**\n• Re-align shaft coupling — mild misalignment signature detected.\n• Replace sensor ACC_DE_X — slight gain drift noted.\n\n**Priority 3 — Routine**\n• Gearbox 02 lubricant change (500-hour interval reached).\n• Verify motor phase-current balance weekly.`,
+  compare:     `⚖️ **Asset Comparison — Test Rig A vs Motor 01**\n\n| Metric | Test Rig A | Motor 01 |\n|---|---|---|\n| Vibration RMS | 3.42 mm/s ⚠️ | 1.82 mm/s ✅ |\n| Temperature | 62.1 °C ⚠️ | 70.3 °C ⚠️ |\n| RPM stability | ±3 RPM ✅ | ±18 RPM ⚠️ |\n| Anomaly score | 0.23 Low | 0.41 Medium |\n| Active alerts | 2 | 1 |\n\n**Motor 01** shows higher-than-expected RPM variance — investigate drive inverter or mechanical coupling.`,
+};
+
+/* ═══ UTILS ═══ */
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const jitter = (base, pct) => base + rand(-pct * base, pct * base);
+const now = () => new Date().toLocaleTimeString('en-GB');
+const dpr = () => window.devicePixelRatio || 1;
+const MAX_HIST = 120;
+
+/* ═══ TOAST ═══ */
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${{success:'✅',warning:'⚠️',error:'🚨'}[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity 0.4s'; el.style.opacity = '0'; }, 3200);
+  setTimeout(() => el.remove(), 3700);
+}
+
+/* ═══ CANVAS HELPERS ═══ */
+function setupCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return null;
+  const d = dpr();
+  canvas.width  = rect.width  * d;
+  canvas.height = rect.height * d;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(d, d);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+function drawLine(canvas, datasets, opts = {}) {
+  const s = setupCanvas(canvas);
+  if (!s) return;
+  const { ctx, w, h } = s;
+  const pad = { top: 10, right: 10, bottom: 24, left: 38 };
+  const cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, w, h);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+  }
+
+  const allVals = datasets.flatMap(d => d.data);
+  const dMin = opts.min ?? Math.min(...allVals);
+  const dMax = opts.max ?? Math.max(...allVals);
+  const range = dMax - dMin || 1;
+
+  // y labels
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  for (let i = 0; i <= 4; i++) {
+    ctx.fillText((dMax - (range / 4) * i).toFixed(opts.decimals ?? 1), pad.left - 4, pad.top + (ch / 4) * i + 3);
+  }
+
+  // threshold
+  if (opts.threshold != null) {
+    const ty = pad.top + ch - ((opts.threshold - dMin) / range) * ch;
+    ctx.strokeStyle = 'rgba(244,63,94,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ty); ctx.lineTo(pad.left + cw, ty); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // series
+  datasets.forEach(ds => {
+    if (!ds.data.length) return;
+    const n = ds.data.length;
+    const pts = ds.data.map((v, i) => ({
+      x: pad.left + (i / (n - 1 || 1)) * cw,
+      y: pad.top + ch - ((v - dMin) / range) * ch,
+    }));
+    if (ds.fill) {
+      const g = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+      const base = ds.color;
+      g.addColorStop(0, base.replace('rgb(', 'rgba(').replace(')', ',0.22)'));
+      g.addColorStop(1, base.replace('rgb(', 'rgba(').replace(')', ',0)'));
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pad.top + ch);
+      pts.forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(pts[pts.length-1].x, pad.top + ch);
+      ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+    }
+    ctx.beginPath(); ctx.strokeStyle = ds.color; ctx.lineWidth = ds.w || 2;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  });
+}
+
+function drawSparkline(canvas, data, color) {
+  if (!canvas) return;
+  const d = dpr();
+  canvas.width = canvas.offsetWidth * d; canvas.height = canvas.offsetHeight * d;
+  const ctx = canvas.getContext('2d'); ctx.scale(d, d);
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  ctx.clearRect(0, 0, w, h);
+  if (data.length < 2) return;
+  const mn = Math.min(...data), mx = Math.max(...data), range = mx - mn || 1;
+  const pts = data.map((v, i) => ({ x: (i / (data.length - 1)) * w, y: h - ((v - mn) / range) * h * 0.85 - h * 0.07 }));
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, color.replace('rgb(','rgba(').replace(')',',0.18)')); g.addColorStop(1, 'transparent');
+  ctx.beginPath(); ctx.moveTo(pts[0].x, h); pts.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, h); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke();
+}
+
+function drawGauge(canvas, value, min, max, color) {
+  const d = dpr(); canvas.width = 180*d; canvas.height = 110*d;
+  const ctx = canvas.getContext('2d'); ctx.scale(d, d);
+  ctx.clearRect(0, 0, 180, 110);
+  const cx = 90, cy = 95, r = 72;
+  const SA = Math.PI * 0.8, EA = Math.PI * 2.2;
+  const pct = clamp((value - min) / (max - min), 0, 1);
+  const VA = SA + pct * (EA - SA);
+  // track
+  ctx.beginPath(); ctx.arc(cx,cy,r,SA,EA); ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=10; ctx.lineCap='round'; ctx.stroke();
+  // fill arc
+  ctx.beginPath(); ctx.arc(cx,cy,r,SA,VA); ctx.strokeStyle=color; ctx.lineWidth=10; ctx.lineCap='round'; ctx.stroke();
+  // ticks
+  for (let i=0;i<=10;i++){
+    const a=SA+(i/10)*(EA-SA), inner=i%5===0?r-18:r-13;
+    ctx.beginPath(); ctx.moveTo(cx+inner*Math.cos(a),cy+inner*Math.sin(a)); ctx.lineTo(cx+(r+2)*Math.cos(a),cy+(r+2)*Math.sin(a));
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=i%5===0?1.5:0.8; ctx.stroke();
+  }
+  // needle
+  const nx=cx+(r-14)*Math.cos(VA), ny=cy+(r-14)*Math.sin(VA);
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(nx,ny); ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+}
+
+function drawFFT(canvas, bins) {
+  const s = setupCanvas(canvas); if (!s) return;
+  const {ctx,w,h} = s;
+  const pad={top:10,right:10,bottom:24,left:38};
+  const cw=w-pad.left-pad.right, ch=h-pad.top-pad.bottom;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(f=>{const y=pad.top+ch*(1-f);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cw,y);ctx.stroke();});
+  const bw=cw/bins.length*0.7;
+  bins.forEach((v,i)=>{
+    const x=pad.left+(i/bins.length)*cw, bh=v*ch, y=pad.top+ch-bh;
+    const g=ctx.createLinearGradient(0,y,0,pad.top+ch);
+    g.addColorStop(0,'rgba(59,130,246,0.9)'); g.addColorStop(1,'rgba(99,102,241,0.3)');
+    ctx.fillStyle=g; ctx.fillRect(x,y,bw,bh);
+  });
+  ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='10px JetBrains Mono,monospace'; ctx.textAlign='center';
+  [0,100,200,300,400,500].forEach(hz=>{ctx.fillText(hz+'Hz',pad.left+(hz/500)*cw,pad.top+ch+16);});
+}
+
+/* ═══ SIMULATION ═══ */
+let fftBins = [];
+
+function simulate() {
+  const a = ASSETS[State.asset];
+  const t = State.ticks++;
+  const spike = (t % 120 >= 115);
+  const vib  = clamp(jitter(a.basevib  + Math.sin(t*0.05)*0.4 + (spike?8:0), 0.03), 0, 20);
+  const temp = clamp(jitter(a.basetemp + Math.sin(t*0.02)*1.5 + (spike?2:0), 0.01), 15, 110);
+  const rpm  = clamp(jitter(a.baserpm  + Math.sin(t*0.03)*12,              0.005), 100, 3200);
+  const anomaly = clamp(0.12 + Math.abs(Math.sin(t*0.04))*0.15 + (spike ? 0.55:0), 0, 1);
+
+  const H = State.history;
+  [['vib',vib],['temp',temp],['rpm',rpm],['anomaly',anomaly]].forEach(([k,v])=>{
+    H[k].push(v); if(H[k].length>MAX_HIST) H[k].shift();
+  });
+
+  const wasAlarm = State.alarmActive;
+  State.alarmActive = vib > 8 || spike;
+  if (State.alarmActive && !wasAlarm) { updateAlarmBanner(true); toast('High vibration — alarm triggered', 'error'); }
+  else if (!State.alarmActive && wasAlarm) updateAlarmBanner(false);
+
+  return { vib, temp, rpm, anomaly };
+}
+
+function genHistData(pts=200) {
+  return Array.from({length:pts},(_,i)=>{
+    const trend=i/pts*0.8, s=Math.sin(i/pts*Math.PI*4)*0.6, n=rand(-0.3,0.3), spike=i===140?5:0;
+    return clamp(3.4+trend+s+n+spike, 0.5, 14);
+  });
+}
+
+/* ═══ RENDER ═══ */
+function colorByThresh(id, val, wT, cT) {
+  const el = document.getElementById(id); if (!el) return;
+  el.style.color = val>=cT ? 'var(--rose)' : val>=wT ? 'var(--amber)' : 'var(--text-primary)';
+}
+
+function updateKPIs(vals) {
+  const kv = document.getElementById('kpi-vib'); if(kv) { kv.textContent=vals.vib.toFixed(2); colorByThresh('kpi-vib',vals.vib,5,8); }
+  const kt = document.getElementById('kpi-temp'); if(kt) kt.textContent=vals.temp.toFixed(1);
+  const kr = document.getElementById('kpi-rpm'); if(kr) kr.textContent=Math.round(vals.rpm);
+  const ka = document.getElementById('kpi-anomaly'); if(ka) { ka.textContent=vals.anomaly.toFixed(2); colorByThresh('kpi-anomaly',vals.anomaly,0.5,0.7); }
+  const H = State.history;
+  drawSparkline(document.getElementById('spark-vib'),     [...H.vib],     'rgb(59,130,246)');
+  drawSparkline(document.getElementById('spark-temp'),    [...H.temp],    'rgb(16,185,129)');
+  drawSparkline(document.getElementById('spark-rpm'),     [...H.rpm],     'rgb(245,158,11)');
+  drawSparkline(document.getElementById('spark-anomaly'), [...H.anomaly], 'rgb(244,63,94)');
+  const ts = document.getElementById('table-last-updated'); if(ts) ts.textContent = 'Updated: '+now();
+  const sub = document.getElementById('overview-subtitle');
+  if(sub) sub.textContent = ASSETS[State.asset].name+' — '+ASSETS[State.asset].label+' · Updated '+now();
+}
+
+function updateMainChart() {
+  const c = document.getElementById('main-chart'); if(!c) return;
+  drawLine(c, [
+    {data:[...State.history.vib], color:'rgb(59,130,246)', fill:true},
+    {data:State.history.temp.map(v=>v*0.1), color:'rgb(16,185,129)', w:1.5},
+  ], {min:0, max:15, threshold:8});
+}
+
+function updateRealtimeChart() {
+  const c = document.getElementById('realtime-chart'); if(!c) return;
+  const H = State.history;
+  drawLine(c, [
+    {data:[...H.vib],                color:'rgb(59,130,246)',  fill:true},
+    {data:H.vib.map(v=>v*0.55),      color:'rgb(6,182,212)',   w:1.5},
+    {data:H.temp.map(v=>v*0.1),      color:'rgb(16,185,129)',  w:1.5},
+    {data:H.rpm.map(v=>v*0.006),     color:'rgb(245,158,11)',  w:1.5},
+  ], {min:0, max:15});
+}
+
+function updateGauges(vib, temp, rpm) {
+  const gv=document.getElementById('gauge-vib');   if(gv){drawGauge(gv,vib,0,15,'rgb(59,130,246)');}
+  const gt=document.getElementById('gauge-temp');  if(gt){drawGauge(gt,temp,20,100,'rgb(16,185,129)');}
+  const gr=document.getElementById('gauge-rpm');   if(gr){drawGauge(gr,rpm,0,3000,'rgb(245,158,11)');}
+  const gvv=document.getElementById('gauge-vib-val');  if(gvv){gvv.textContent=vib.toFixed(2);  colorByThresh('gauge-vib-val',vib,5,8);}
+  const gtv=document.getElementById('gauge-temp-val'); if(gtv) gtv.textContent=temp.toFixed(1);
+  const grv=document.getElementById('gauge-rpm-val');  if(grv) grv.textContent=Math.round(rpm);
+}
+
+function updateFFT() {
+  const c = document.getElementById('fft-chart'); if(!c) return;
+  if (!fftBins.length) {
+    for(let i=0;i<60;i++){
+      const hz=(i/60)*500;
+      let v=0.05;
+      if(Math.abs(hz-25)<5)  v=0.35+rand(0,.1);
+      if(Math.abs(hz-50)<4)  v=0.22+rand(0,.08);
+      if(Math.abs(hz-87)<6)  v=0.68+rand(0,.1);
+      if(Math.abs(hz-150)<3) v=0.15+rand(0,.05);
+      fftBins.push(v+rand(-.02,.02));
+    }
+  } else {
+    fftBins = fftBins.map(v=>clamp(v+rand(-.01,.01),0.03,1));
+  }
+  drawFFT(c, fftBins);
+}
+
+function renderSensorTable() {
+  const tbody = document.getElementById('sensor-table-body'); if(!tbody) return;
+  const H = State.history;
+  const a = ASSETS[State.asset];
+  const rows = [
+    {name:'Drive-End Vibration',  ch:'acc_de_x',   v:H.vib[H.vib.length-1]||a.basevib,   unit:'mm/s', status: (H.vib[H.vib.length-1]||0)>8?'critical':(H.vib[H.vib.length-1]||0)>5?'warning':'ok'},
+    {name:'Non-Drive Vibration',  ch:'acc_nde_y',  v:(H.vib[H.vib.length-1]||a.basevib)*0.55, unit:'mm/s', status:'ok'},
+    {name:'Bearing Temperature',  ch:'temp_de',    v:H.temp[H.temp.length-1]||a.basetemp, unit:'°C',   status:(H.temp[H.temp.length-1]||0)>75?'critical':(H.temp[H.temp.length-1]||0)>65?'warning':'ok'},
+    {name:'Motor Temperature',    ch:'temp_motor', v:(H.temp[H.temp.length-1]||a.basetemp)*1.12, unit:'°C', status:'ok'},
+    {name:'Shaft Speed',          ch:'rpm_shaft',  v:H.rpm[H.rpm.length-1]||a.baserpm,    unit:'RPM',  status:'ok'},
+    {name:'Current (Phase A)',    ch:'curr_phA',   v:jitter(18, 0.03),                     unit:'A',    status:'ok'},
+  ];
+  const c={critical:'var(--rose)',warning:'var(--amber)',ok:'var(--green)'};
+  tbody.innerHTML=rows.map(r=>`
+    <tr>
+      <td>${r.name}</td><td class="mono">${r.ch}</td>
+      <td class="mono" style="font-weight:700">${parseFloat(r.v).toFixed(2)}</td>
+      <td class="mono" style="color:var(--text-secondary)">${r.unit}</td>
+      <td><span class="health-dot" style="background:${c[r.status]}"></span>${r.status.toUpperCase()}</td>
+      <td class="mono" style="color:var(--text-secondary)">${now()}</td>
+    </tr>`).join('');
+}
+
+function renderRecentAlerts() {
+  const el = document.getElementById('recent-alerts-list'); if(!el) return;
+  const icons = {critical:'🔴',warning:'🟡',info:'🔵'};
+  const active = ALERT_DATA.filter(a=>!a.acked).slice(0,3);
+  el.innerHTML = active.map(a=>`
+    <div class="alert-item ${a.sev}">
+      <div class="alert-sev-icon">${icons[a.sev]||'ℹ️'}</div>
+      <div class="alert-body"><div class="alert-title">${a.title}</div><div class="alert-meta">${a.time}</div></div>
+    </div>`).join('') || '<div style="padding:12px;color:var(--text-muted);font-size:13px;">No active alerts ✅</div>';
+}
+
+function renderFullAlerts(filter='all') {
+  const el = document.getElementById('full-alert-list'); if(!el) return;
+  const icons={critical:'🚨',warning:'⚠️',info:'ℹ️'};
+  let items=[...ALERT_DATA];
+  if(filter==='acked') items=items.filter(a=>a.acked);
+  else if(filter!=='all') items=items.filter(a=>a.sev===filter&&!a.acked);
+  el.innerHTML=items.map(a=>`
+    <div class="alert-item ${a.acked?'acked':a.sev}" id="alert-${a.id}">
+      <div class="alert-sev-icon">${icons[a.sev]||'ℹ️'}</div>
+      <div class="alert-body">
+        <div class="alert-title">${a.acked?'✓ ':''}${a.title}</div>
+        <div class="alert-desc">${a.desc}</div>
+        <div class="alert-meta">Asset: ${a.asset} · ${a.time}</div>
+      </div>
+      ${!a.acked?`<button class="alert-ack-btn" onclick="ackAlert(${a.id})">Acknowledge</button>`:'<span style="font-size:11px;color:var(--green);white-space:nowrap;">✓ Acked</span>'}
+    </div>`).join('') || '<div style="padding:12px;color:var(--text-muted);font-size:13px;">No alerts here.</div>';
+}
+
+function updateAlertBadge() {
+  const n=ALERT_DATA.filter(a=>!a.acked).length;
+  ['alert-count-badge','nav-alert-badge'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=n;});
+  const ac=document.getElementById('active-alert-count'); if(ac) ac.textContent=n+' Active';
+  const badge=document.getElementById('alert-count-badge'); if(badge) badge.style.display=n?'flex':'none';
+}
+
+function updateAlarmBanner(active) {
+  const b=document.getElementById('alarm-banner'); if(!b) return;
+  active?b.classList.add('active'):b.classList.remove('active');
+  const pill=document.getElementById('asset-status-pill'), txt=document.getElementById('asset-status-text');
+  if(active){pill.className='status-pill alarm';txt.textContent='ALARM';}
+  else{pill.className='status-pill ok';txt.textContent='Nominal';}
+}
+
+function renderMLPanel() {
+  const m=ML_MODELS[State.model];
+  const re=document.getElementById('model-results'); if(re) re.innerHTML=`
+    <div class="model-metric"><div class="model-metric-label">Anomaly Score</div>
+      <div class="model-metric-value" style="color:${m.anomalyScore>0.7?'var(--rose)':m.anomalyScore>0.4?'var(--amber)':'var(--green)'}">${m.anomalyScore.toFixed(2)}</div>
+      <div class="model-metric-sub">Threshold: 0.70</div></div>
+    <div class="model-metric"><div class="model-metric-label">RUL Estimate</div>
+      <div class="model-metric-value" style="color:var(--cyan)">${m.rul}%</div>
+      <div class="model-metric-sub">~${m.rul*4} operating hours</div></div>
+    <div class="model-metric"><div class="model-metric-label">F1 Score</div>
+      <div class="model-metric-value" style="color:var(--accent)">${m.f1.toFixed(1)}%</div>
+      <div class="model-metric-sub">On validation set</div></div>
+    <div class="model-metric"><div class="model-metric-label">Inference Latency</div>
+      <div class="model-metric-value" style="color:var(--purple)">${m.latency}</div>
+      <div class="model-metric-sub">Per batch (avg)</div></div>`;
+
+  const bar=document.getElementById('anomaly-bar-fill');
+  if(bar){bar.style.width=(m.anomalyScore*100)+'%';bar.style.background=m.anomalyScore>0.7?'linear-gradient(90deg,var(--rose),var(--purple))':m.anomalyScore>0.4?'linear-gradient(90deg,var(--amber),#f97316)':'linear-gradient(90deg,var(--green),var(--cyan))';}
+  const sc=document.getElementById('anomaly-score-text'); if(sc) sc.textContent=m.anomalyScore.toFixed(2)+' / 1.00';
+  const rb=document.getElementById('rul-bar-fill');
+  if(rb){rb.style.width=m.rul+'%';rb.className='rul-bar-fill'+(m.rul<30?' low':m.rul<60?' medium':'');}
+  const rt=document.getElementById('rul-value-text'); if(rt) rt.textContent=m.rul+'% — ~'+(m.rul*4)+' operating hours';
+  const ft=document.getElementById('fault-tags');
+  if(ft) ft.innerHTML=m.faults.map(f=>`<div class="fault-tag ${f.state}">${f.state==='active'?'🔴':f.state==='warn'?'⚠️':'✅'} ${f.label}</div>`).join('');
+}
+
+function renderMLCompare() {
+  const tb=document.getElementById('model-compare-body'); if(!tb) return;
+  tb.innerHTML=Object.entries(ML_MODELS).map(([k,m])=>`
+    <tr><td style="font-weight:600">${m.label}</td>
+    <td class="mono">${m.accuracy.toFixed(1)}%</td><td class="mono">${m.precision.toFixed(1)}%</td>
+    <td class="mono">${m.recall.toFixed(1)}%</td><td class="mono">${m.f1.toFixed(1)}%</td>
+    <td class="mono">${m.latency}</td>
+    <td><span class="badge ${k===State.model?'blue':'green'}">${k===State.model?'Active':'Available'}</span></td></tr>`).join('');
+}
+
+function renderComparison() {
+  const g=document.getElementById('comparison-grid'); if(!g) return;
+  g.innerHTML=Object.entries(ASSETS).map(([key,a])=>{
+    const vib=jitter(a.basevib,.08).toFixed(2), temp=jitter(a.basetemp,.03).toFixed(1), rpm=Math.round(jitter(a.baserpm,.01));
+    const sc=(0.1+Math.random()*0.4).toFixed(2);
+    const vp=Math.min(100,parseFloat(vib)/15*100), tp=Math.min(100,(parseFloat(temp)-20)/80*100), rp=Math.min(100,rpm/3000*100);
+    const sColor=parseFloat(vib)>4?'var(--amber)':'var(--green)', sText=parseFloat(vib)>4?'Caution':'Nominal';
+    return `<div class="card comparison-card">
+      <div class="comparison-asset-name">🏭 ${a.name} <span class="badge" style="color:${sColor};border-color:${sColor};background:transparent">${sText}</span></div>
+      <div class="comparison-metric-row"><div><div class="comparison-metric-name">Vibration RMS</div><div class="comparison-metric-bar-wrap"><div class="comparison-metric-bar" style="width:${vp}%;background:var(--accent)"></div></div></div><div class="comparison-metric-value" style="color:var(--accent)">${vib} mm/s</div></div>
+      <div class="comparison-metric-row"><div><div class="comparison-metric-name">Temperature</div><div class="comparison-metric-bar-wrap"><div class="comparison-metric-bar" style="width:${tp}%;background:var(--green)"></div></div></div><div class="comparison-metric-value" style="color:var(--green)">${temp} °C</div></div>
+      <div class="comparison-metric-row"><div><div class="comparison-metric-name">Shaft Speed</div><div class="comparison-metric-bar-wrap"><div class="comparison-metric-bar" style="width:${rp}%;background:var(--amber)"></div></div></div><div class="comparison-metric-value" style="color:var(--amber)">${rpm} RPM</div></div>
+      <div class="comparison-metric-row"><div class="comparison-metric-name">Anomaly Score</div><div class="comparison-metric-value">${sc}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnomalyTimeline() {
+  const el=document.getElementById('anomaly-timeline'); if(!el) return;
+  const c={critical:'var(--rose)',warning:'var(--amber)',info:'var(--accent)'};
+  el.innerHTML=ANOMALY_EVENTS.map(e=>`
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:10px;height:10px;border-radius:50%;background:${c[e.sev]};margin-top:4px;flex-shrink:0"></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${e.msg}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace">${e.ts} · ${e.model}</div></div>
+      <span class="badge ${e.sev==='critical'?'rose':e.sev==='warning'?'amber':'blue'}">${e.sev.toUpperCase()}</span>
+    </div>`).join('');
+}
+
+function drawHistCharts() {
+  const hv=document.getElementById('hist-vib-chart');
+  if(hv) drawLine(hv,[{data:genHistData(),color:'rgb(59,130,246)',fill:true}],{min:0,max:15,threshold:8});
+  const ht=document.getElementById('hist-temp-chart');
+  if(ht) drawLine(ht,[{data:Array.from({length:100},(_,i)=>58+Math.sin(i*.1)*5+rand(-1,1)),color:'rgb(16,185,129)',fill:true}],{min:40,max:100});
+  const hr=document.getElementById('hist-rpm-chart');
+  if(hr) drawLine(hr,[{data:Array.from({length:100},(_,i)=>1482+Math.sin(i*.15)*20+rand(-5,5)),color:'rgb(245,158,11)',fill:true}],{min:1400,max:1560,decimals:0});
+  const cc=document.getElementById('compare-chart');
+  if(cc) drawLine(cc,Object.entries(ASSETS).map(([k,a],ci)=>{
+    const colors=['rgb(59,130,246)','rgb(16,185,129)','rgb(245,158,11)','rgb(244,63,94)'];
+    return {data:Array.from({length:80},(_,i)=>a.basevib+Math.sin(i*.08+ci)*0.4+rand(-.2,.2)),color:colors[ci],w:2};
+  }),{min:0,max:12});
+  const cf=document.getElementById('confidence-chart');
+  if(cf){const cols=['rgb(59,130,246)','rgb(16,185,129)','rgb(245,158,11)','rgb(168,85,247)'];
+    drawLine(cf,Object.values(ML_MODELS).map((m,i)=>({data:Array.from({length:80},(_,j)=>(m.accuracy/100)+Math.sin(j*.1+i)*.03+rand(-.01,.01)),color:cols[i],w:2})),{min:0.6,max:1.05,decimals:2});}
+}
+
+/* ═══ CHAT ═══ */
+function addChatMsg(role, text) {
+  const msgs=document.getElementById('chat-messages'); if(!msgs) return;
+  const isUser=role==='user';
+  const d=document.createElement('div'); d.className=`chat-msg${isUser?' user':''}`;
+  const init=isUser?State.role[0].toUpperCase():'AI';
+  const formatted=text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\|(.*)\|/g,(m,p)=>`<code>${p}</code>`);
+  d.innerHTML=`<div class="chat-avatar ${isUser?'user':'ai'}">${init}</div><div><div class="chat-bubble ${isUser?'user':'ai'}">${formatted}</div><div class="chat-time">${now()}</div></div>`;
+  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs=document.getElementById('chat-messages'); if(!msgs) return null;
+  const d=document.createElement('div'); d.className='chat-msg'; d.id='typing-ind';
+  d.innerHTML=`<div class="chat-avatar ai">AI</div><div><div class="chat-bubble ai"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>`;
+  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight; return d;
+}
+
+function getAIReply(q) {
+  const ql=q.toLowerCase();
+  if(ql.includes('health')||ql.includes('status')) return AI_ANSWERS.health;
+  if(ql.includes('anomaly')||ql.includes('vibration')||ql.includes('spike')) return AI_ANSWERS.anomaly;
+  if(ql.includes('rul')||ql.includes('remaining')||ql.includes('life')) return AI_ANSWERS.rul;
+  if(ql.includes('maint')||ql.includes('recommend')||ql.includes('fix')) return AI_ANSWERS.maintenance;
+  if(ql.includes('compar')||ql.includes('motor')||ql.includes('rig')) return AI_ANSWERS.compare;
+  const H=State.history;
+  return `I reviewed live data from **${ASSETS[State.asset].name}**.\n\nCurrent readings:\n• Vibration: **${(H.vib[H.vib.length-1]||3.4).toFixed(2)} mm/s**\n• Temperature: **${(H.temp[H.temp.length-1]||62).toFixed(1)} °C**\n• Anomaly Score: **${(H.anomaly[H.anomaly.length-1]||0.23).toFixed(2)}**\n\nTry asking about: **health status, anomalies, remaining useful life, or maintenance recommendations**. 🤖`;
+}
+
+function sendChat() {
+  const input=document.getElementById('chat-input'); if(!input) return;
+  const text=input.value.trim(); if(!text) return;
+  input.value='';
+  addChatMsg('user',text);
+  const t=showTyping();
+  setTimeout(()=>{if(t)t.remove();addChatMsg('ai',getAIReply(text));},900+Math.random()*600);
+}
+
+function initChat() {
+  addChatMsg('ai',`👋 Hello! I'm the **IAA Diagnostic AI Assistant**.\n\nI have read-only access to live sensor data from **${ASSETS[State.asset].name}** and can help you:\n• Explain anomalies and alerts\n• Estimate remaining useful life\n• Recommend maintenance actions\n• Compare multiple assets\n\nAll insights are cited from sensor readings and ML model outputs. How can I help?`);
+}
+
+/* ═══ GLOBAL HELPERS (called from HTML) ═══ */
+let _alertFilter='all';
+function ackAlert(id) {
+  const a=ALERT_DATA.find(x=>x.id===id); if(!a) return;
+  a.acked=true; toast('Alert acknowledged','success'); updateAlertBadge(); renderFullAlerts(_alertFilter); renderRecentAlerts();
+}
+function ackAll() {
+  ALERT_DATA.forEach(a=>a.acked=true); toast('All alerts acknowledged','success');
+  updateAlertBadge(); renderFullAlerts(_alertFilter); renderRecentAlerts(); updateAlarmBanner(false); State.alarmActive=false;
+}
+window.ackAlert=ackAlert; window.ackAll=ackAll;
+
+/* ═══ NAVIGATION ═══ */
+function switchView(id) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.remove('active'));
+  const vEl=document.getElementById('view-'+id); if(vEl) vEl.classList.add('active');
+  const nEl=document.querySelector(`.nav-item[data-view="${id}"]`); if(nEl) nEl.classList.add('active');
+  State.activeView=id;
+  setTimeout(()=>{
+    if(id==='historical'){renderAnomalyTimeline();drawHistCharts();}
+    if(id==='ml-models'){renderMLPanel();renderMLCompare();drawHistCharts();}
+    if(id==='comparison'){renderComparison();drawHistCharts();}
+    if(id==='ai-assistant'&&!document.getElementById('chat-messages').children.length) initChat();
+    if(id==='alerts') renderFullAlerts(_alertFilter);
+    if(id==='realtime'){const H=State.history;updateGauges(H.vib[H.vib.length-1]||3.4,H.temp[H.temp.length-1]||62,H.rpm[H.rpm.length-1]||1482);updateRealtimeChart();updateFFT();}
+  },80);
+}
+
+/* ═══ MAIN LOOP ═══ */
+function tick() {
+  const vals=simulate();
+  const v=State.activeView;
+  if(v==='overview'){updateKPIs(vals);updateMainChart();renderSensorTable();renderRecentAlerts();}
+  else if(v==='realtime'){updateGauges(vals.vib,vals.temp,vals.rpm);updateRealtimeChart();if(State.ticks%3===0)updateFFT();}
+}
+
+/* ═══ BOOT ═══ */
+document.addEventListener('DOMContentLoaded',()=>{
+  // Role selection
+  let selRole='researcher';
+  document.querySelectorAll('.role-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.role-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); selRole=b.dataset.role;
+    });
+  });
+
+  // Login
+  document.getElementById('login-btn').addEventListener('click',()=>{
+    State.role=selRole;
+    const lbl={operator:'Operator',researcher:'Researcher',supervisor:'Supervisor',admin:'Admin'};
+    const clr={operator:'#f59e0b',researcher:'#3b82f6',supervisor:'#10b981',admin:'#f43f5e'};
+    const ini={operator:'O',researcher:'R',supervisor:'S',admin:'A'};
+    document.getElementById('user-name-display').textContent='A. '+lbl[selRole];
+    document.getElementById('user-role-display').textContent=lbl[selRole];
+    const av=document.getElementById('user-avatar');
+    av.style.background=`linear-gradient(135deg,${clr[selRole]},#6366f1)`; av.textContent=ini[selRole];
+    const ls=document.getElementById('login-screen');
+    ls.style.transition='opacity 0.4s'; ls.style.opacity='0';
+    setTimeout(()=>{
+      ls.style.display='none';
+      document.getElementById('app').classList.add('visible');
+      for(let i=0;i<60;i++) simulate();
+      tick(); setInterval(tick,1000);
+      renderRecentAlerts(); updateAlertBadge();
+      setTimeout(drawHistCharts,300);
+    },400);
+  });
+
+  // Nav
+  document.querySelectorAll('.nav-item[data-view]').forEach(item=>{
+    item.addEventListener('click',()=>switchView(item.dataset.view));
+  });
+
+  // Asset switch
+  document.getElementById('asset-select').addEventListener('change',e=>{
+    State.asset=e.target.value;
+    State.history={vib:[],temp:[],rpm:[],anomaly:[]};
+    for(let i=0;i<60;i++) simulate();
+    toast('Switched to '+ASSETS[State.asset].name,'success');
+    if(State.activeView==='comparison') setTimeout(renderComparison,100);
+  });
+
+  // Model tabs
+  document.querySelectorAll('.model-tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.model-tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active'); State.model=t.dataset.model; renderMLPanel();
+    });
+  });
+
+  // Alert filter
+  document.getElementById('alert-filter-tabs')?.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-filter]'); if(!btn) return;
+    document.querySelectorAll('#alert-filter-tabs .time-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); _alertFilter=btn.dataset.filter; renderFullAlerts(_alertFilter);
+  });
+
+  // Alarm dismiss
+  document.getElementById('alarm-dismiss-btn')?.addEventListener('click',()=>{
+    ackAlert(1); State.alarmActive=false; updateAlarmBanner(false); toast('Alarm acknowledged','success');
+  });
+
+  // Ack all
+  document.getElementById('ack-all-btn')?.addEventListener('click', ackAll);
+
+  // Alarm toggle
+  document.getElementById('alarm-toggle-btn')?.addEventListener('click',()=>{
+    State.alarmActive=!State.alarmActive;
+    updateAlarmBanner(State.alarmActive);
+    toast(State.alarmActive?'Manual alarm triggered':'Alarm cleared', State.alarmActive?'warning':'success');
+  });
+
+  // Chat
+  document.getElementById('chat-send-btn')?.addEventListener('click',sendChat);
+  document.getElementById('chat-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+  // Quick prompts
+  document.querySelectorAll('[data-prompt]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      switchView('ai-assistant');
+      const input=document.getElementById('chat-input');
+      if(input){input.value=btn.dataset.prompt; sendChat();}
+    });
+  });
+
+  // Logout
+  document.getElementById('logout-btn')?.addEventListener('click',()=>{
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('app').style.display='none';
+    const ls=document.getElementById('login-screen');
+    ls.style.display='flex'; ls.style.opacity='1'; toast('Signed out','success');
+  });
+
+  // Fullscreen
+  document.getElementById('fullscreen-btn')?.addEventListener('click',()=>{
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  });
+
+  // Resize
+  window.addEventListener('resize',()=>{
+    const v=State.activeView;
+    if(v==='overview') updateMainChart();
+    if(v==='realtime'){updateRealtimeChart();updateFFT();}
+    if(['historical','comparison','ml-models'].includes(v)) drawHistCharts();
+  });
+});
+</script>
+</body>
+</html>

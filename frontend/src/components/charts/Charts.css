@@ -1,0 +1,13 @@
+.chart-container {
+  width: 100%;
+  position: relative;
+  background-color: var(--bg-surface);
+  border-radius: var(--border-radius-md);
+  padding: 8px 0;
+}
+
+.gauge-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

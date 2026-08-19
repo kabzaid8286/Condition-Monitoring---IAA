@@ -1,0 +1,83 @@
+.app-layout {
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.logo-container {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-surface-elevated);
+}
+
+.logo-text {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 1.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.app-header {
+  padding: 0 24px;
+  background-color: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 5;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.connected {
+  background-color: var(--status-healthy);
+  box-shadow: 0 0 8px var(--status-healthy);
+}
+
+.status-dot.disconnected {
+  background-color: var(--status-critical);
+}
+
+.content-wrapper {
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  background-color: var(--bg-primary);
+}
+
+.ant-menu-dark {
+  background-color: transparent !important;
+}
+
+.ant-menu-dark .ant-menu-item-selected {
+  background-color: var(--accent-primary) !important;
+}

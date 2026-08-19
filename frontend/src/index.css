@@ -1,0 +1,112 @@
+:root {
+  --bg-primary: #0a0e17;
+  --bg-surface: #111827;
+  --bg-surface-elevated: #1a2235;
+  --border-color: #2a3548;
+  --text-primary: #e8edf5;
+  --text-secondary: #8b95a8;
+  --accent-primary: #3b82f6;
+  --status-healthy: #10b981;
+  --status-warning: #f59e0b;
+  --status-critical: #ef4444;
+  --status-info: #6366f1;
+  --status-offline: #6b7280;
+
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --transition-speed: 0.3s;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-surface-elevated);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+/* Utilities */
+.text-healthy { color: var(--status-healthy); }
+.text-warning { color: var(--status-warning); }
+.text-critical { color: var(--status-critical); }
+.text-info { color: var(--status-info); }
+.text-offline { color: var(--status-offline); }
+
+.bg-healthy { background-color: var(--status-healthy); }
+.bg-warning { background-color: var(--status-warning); }
+.bg-critical { background-color: var(--status-critical); }
+.bg-info { background-color: var(--status-info); }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-fade-in { animation: fadeIn var(--transition-speed) ease-in-out; }
+.animate-slide-up { animation: slideUp var(--transition-speed) ease-out; }
+.animate-pulse { animation: pulse 2s infinite; }
+
+/* Ant Design Overrides */
+.ant-layout {
+  background-color: var(--bg-primary) !important;
+}
+.ant-card {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
+  border-radius: var(--border-radius-md) !important;
+}
+.ant-card-head {
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+.ant-table {
+  background-color: transparent !important;
+}
+.ant-table-thead > tr > th {
+  background-color: var(--bg-surface-elevated) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-secondary) !important;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background-color: var(--bg-surface-elevated) !important;
+}

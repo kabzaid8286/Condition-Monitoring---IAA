@@ -1,0 +1,87 @@
+/* Status Badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  font-weight: 500;
+}
+
+.status-badge.size-small {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
+.status-badge .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge.size-small .status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.status-healthy .status-dot { background-color: var(--status-healthy); box-shadow: 0 0 6px var(--status-healthy); }
+.status-warning .status-dot { background-color: var(--status-warning); box-shadow: 0 0 6px var(--status-warning); }
+.status-critical .status-dot { background-color: var(--status-critical); box-shadow: 0 0 6px var(--status-critical); }
+.status-info .status-dot { background-color: var(--status-info); }
+.status-offline .status-dot { background-color: var(--status-offline); }
+
+.status-healthy .status-text { color: var(--status-healthy); }
+.status-warning .status-text { color: var(--status-warning); }
+.status-critical .status-text { color: var(--status-critical); }
+.status-info .status-text { color: var(--status-info); }
+.status-offline .status-text { color: var(--text-secondary); }
+
+/* Data Table */
+.data-table-container {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
+.ant-table-wrapper {
+  margin: 0 !important;
+}
+
+/* Loading Spinner */
+.loading-fullpage {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(10, 14, 23, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: inherit;
+}
+
+.loading-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.loading-text {
+  font-size: 0.9rem;
+}
