@@ -355,6 +355,7 @@ canvas.chart-canvas { width: 100%; height: 180px; display: block; }
     </div>
     <div class="header-actions">
       <div class="icon-btn" id="alarm-toggle-btn" title="Toggle alarm">🔔<div class="notif-badge" id="alert-count-badge">3</div></div>
+      <div class="icon-btn" id="download-report-btn" title="Download Report">📥</div>
       <div class="icon-btn" id="fullscreen-btn" title="Fullscreen">⛶</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar" style="background:linear-gradient(135deg,var(--accent),var(--purple))">R</div>
@@ -1312,6 +1313,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // Fullscreen
+  // Download Report
+  document.getElementById('download-report-btn')?.addEventListener('click',()=>{
+    toast('Generating CSV report...', 'success');
+    setTimeout(() => {
+      const csvContent = "data:text/csv;charset=utf-8,Timestamp,Vibration_RMS,Temperature,RPM\n" + 
+        "2026-08-20 12:00:01,2.4,55.1,1490\n" +
+        "2026-08-20 12:00:02,2.5,55.1,1491\n" +
+        "2026-08-20 12:00:03,2.4,55.2,1490\n" +
+        "2026-08-20 12:00:04,11.2,57.1,1485 (ANOMALY)\n";
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "IAA_Asset_Report.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, 800);
+  });
+
   document.getElementById('fullscreen-btn')?.addEventListener('click',()=>{
     if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
     else document.exitFullscreen?.();
