@@ -1,5 +1,5 @@
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { iaaLogoBase64, hsAalenLogoBase64 } from './logos';
 
 export function exportCSV(data, fileName = 'IAA_Asset_Report.csv') {
@@ -31,12 +31,11 @@ export function exportPDF(data, fileName = 'IAA_Executive_Report.pdf') {
     }
     
     if (hsAalenLogoBase64) {
-      // SVGs may not render properly using addImage unless the browser supports it, but jsPDF supports some svgs
-      // For safety, we try adding it as SVG if jspdf advanced addSvg is available, otherwise just try standard addImage
       try {
-        doc.addImage(hsAalenLogoBase64, 'SVG', 160, 10, 35, 15);
+        doc.addImage(hsAalenLogoBase64, 'PNG', 160, 10, 35, 15);
       } catch (e) {
-        console.warn("Could not add SVG logo", e);
+        doc.setFontSize(10);
+        doc.text("HS Aalen", 180, 15);
       }
     }
 
@@ -69,7 +68,7 @@ export function exportPDF(data, fileName = 'IAA_Executive_Report.pdf') {
       row.anomaly.toFixed(2)
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 70,
       head: [['Timestamp', 'Vibration', 'Temperature', 'RPM', 'Anomaly Score']],
       body: tableData,
@@ -79,7 +78,7 @@ export function exportPDF(data, fileName = 'IAA_Executive_Report.pdf') {
       alternateRowStyles: { fillColor: [245, 247, 250] }
     });
 
-    const finalY = doc.lastAutoTable.finalY + 15;
+    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : 150;
     doc.setFontSize(10);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(100);

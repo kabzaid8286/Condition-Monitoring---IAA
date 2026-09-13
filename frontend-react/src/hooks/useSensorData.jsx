@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import { ASSETS } from '../data/mockData';
 
-export default function useSensorData() {
+export default function useSensorData(activeAsset = 'test-rig-a') {
+  const assetBase = ASSETS[activeAsset] || ASSETS['test-rig-a'];
+
   const [data, setData] = useState(() => {
     const initLabels = [];
     const initVibX = [];
@@ -14,12 +17,12 @@ export default function useSensorData() {
       let t = new Date(now.getTime() - i * 1000);
       initLabels.push(t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       
-      initVibX.push((Math.random() * 2 + 1).toFixed(2));
-      initVibY.push((Math.random() * 2 + 0.8).toFixed(2));
-      initVibZ.push((Math.random() * 2 + 0.5).toFixed(2));
+      initVibX.push((Math.random() * 2 + assetBase.basevib - 1).toFixed(2));
+      initVibY.push((Math.random() * 2 + assetBase.basevib - 1.2).toFixed(2));
+      initVibZ.push((Math.random() * 2 + assetBase.basevib - 1.5).toFixed(2));
       
-      initTemp.push((Math.random() * 5 + 40).toFixed(1));
-      initRpm.push(Math.floor(Math.random() * 50 + 1450));
+      initTemp.push((Math.random() * 5 + assetBase.basetemp - 2).toFixed(1));
+      initRpm.push(Math.floor(Math.random() * 50 + assetBase.baserpm - 25));
     }
     return {
       labels: initLabels,
@@ -40,6 +43,35 @@ export default function useSensorData() {
   });
 
   useEffect(() => {
+    // Re-initialize with 60 data points when asset changes
+    const initLabels = [];
+    const initVibX = [];
+    const initVibY = [];
+    const initVibZ = [];
+    const initTemp = [];
+    const initRpm = [];
+    
+    let now = new Date();
+    for(let i = 60; i >= 0; i--) {
+      let t = new Date(now.getTime() - i * 1000);
+      initLabels.push(t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      
+      initVibX.push((Math.random() * 2 + assetBase.basevib - 1).toFixed(2));
+      initVibY.push((Math.random() * 2 + assetBase.basevib - 1.2).toFixed(2));
+      initVibZ.push((Math.random() * 2 + assetBase.basevib - 1.5).toFixed(2));
+      
+      initTemp.push((Math.random() * 5 + assetBase.basetemp - 2).toFixed(1));
+      initRpm.push(Math.floor(Math.random() * 50 + assetBase.baserpm - 25));
+    }
+
+    setData({
+      labels: initLabels,
+      vibX: initVibX,
+      vibY: initVibY,
+      vibZ: initVibZ,
+      temp: initTemp,
+      rpm: initRpm
+    });
 
     // Start simulation interval
     const interval = setInterval(() => {
@@ -54,12 +86,12 @@ export default function useSensorData() {
         const nowTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         newLabels.push(nowTime);
 
-        // Simulation logic
-        let vx = (Math.random() * 2 + 1).toFixed(2);
-        let vy = (Math.random() * 2 + 0.8).toFixed(2);
-        let vz = (Math.random() * 2 + 0.5).toFixed(2);
-        let tp = (Math.random() * 5 + 40).toFixed(1);
-        let rp = Math.floor(Math.random() * 50 + 1450);
+        // Simulation logic using activeAsset baselines
+        let vx = (Math.random() * 2 + assetBase.basevib - 1).toFixed(2);
+        let vy = (Math.random() * 2 + assetBase.basevib - 1.2).toFixed(2);
+        let vz = (Math.random() * 2 + assetBase.basevib - 1.5).toFixed(2);
+        let tp = (Math.random() * 5 + assetBase.basetemp - 2).toFixed(1);
+        let rp = Math.floor(Math.random() * 50 + assetBase.baserpm - 25);
 
         newVibX.push(vx);
         newVibY.push(vy);
@@ -86,7 +118,7 @@ export default function useSensorData() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [activeAsset]); // Re-run effect when activeAsset changes
 
   return { data, kpis };
 }

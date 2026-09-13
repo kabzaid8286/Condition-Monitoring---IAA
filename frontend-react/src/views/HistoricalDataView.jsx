@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { commonOptions } from '../components/charts/ChartConfig';
 import { ANOMALY_EVENTS } from '../data/mockData';
 
 export default function HistoricalDataView({ data }) {
-  
+  const [timeRange, setTimeRange] = useState('7D');
+
   const histVibData = {
     labels: data.labels,
     datasets: [{
@@ -24,8 +25,8 @@ export default function HistoricalDataView({ data }) {
     datasets: [{
       label: 'Temperature',
       data: data.temp.map(v => (v * 1.1).toFixed(2)),
-      borderColor: '#f43f5e',
-      backgroundColor: 'rgba(244, 63, 94, 0.1)',
+      borderColor: '#10b981',
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
       borderWidth: 2,
       tension: 0.4,
       fill: true,
@@ -38,8 +39,8 @@ export default function HistoricalDataView({ data }) {
     datasets: [{
       label: 'RPM',
       data: data.rpm.map(v => (v * 0.95).toFixed(0)),
-      borderColor: '#a855f7',
-      backgroundColor: 'rgba(168, 85, 247, 0.1)',
+      borderColor: '#f59e0b',
+      backgroundColor: 'rgba(245, 158, 11, 0.1)',
       borderWidth: 2,
       tension: 0.4,
       fill: true,
@@ -47,22 +48,36 @@ export default function HistoricalDataView({ data }) {
     }]
   };
 
+  const sevColors = {
+    critical: 'var(--rose)',
+    warning: 'var(--amber)',
+    info: 'var(--accent)'
+  };
+
   return (
     <>
-      <div className="page-title">📈 Historical Trends</div>
-      <div className="page-title-sub">Long-range time series analysis and anomaly timeline</div>
+      <div>
+        <div className="page-title">📈 Historical Trends</div>
+        <div className="page-title-sub">Long-range time series analysis and anomaly timeline</div>
+      </div>
 
       <div className="card" style={{ marginTop: "20px" }}>
         <div className="card-header">
           <div className="card-title">Vibration RMS — 7-Day History</div>
           <div className="time-range-btns">
-            <button className="time-btn">1D</button>
-            <button className="time-btn active">7D</button>
-            <button className="time-btn">30D</button>
+            {['1D', '7D', '30D'].map(range => (
+              <button
+                key={range}
+                className={`time-btn ${timeRange === range ? 'active' : ''}`}
+                onClick={() => setTimeRange(range)}
+              >
+                {range}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="chart-wrap">
-          <Line options={commonOptions} data={histVibData} height={200} />
+        <div className="chart-wrap" style={{ height: "200px" }}>
+          <Line options={commonOptions} data={histVibData} />
         </div>
       </div>
 
@@ -71,41 +86,70 @@ export default function HistoricalDataView({ data }) {
           <div className="card-header">
             <div className="card-title">Bearing Temperature History</div>
           </div>
-          <div className="chart-wrap">
-            <Line options={commonOptions} data={histTempData} height={160} />
+          <div className="chart-wrap" style={{ height: "160px" }}>
+            <Line options={commonOptions} data={histTempData} />
           </div>
         </div>
         <div className="card">
           <div className="card-header">
-            <div className="card-title">RPM & Load Trend</div>
+            <div className="card-title">RPM &amp; Load Trend</div>
           </div>
-          <div className="chart-wrap">
-            <Line options={commonOptions} data={histRpmData} height={160} />
+          <div className="chart-wrap" style={{ height: "160px" }}>
+            <Line options={commonOptions} data={histRpmData} />
           </div>
         </div>
       </div>
 
-      <div className="card w-full mt-4">
-        <div className="card-header border-b">
-          <h2 className="card-title">Anomaly Event Timeline</h2>
+      <div className="card" style={{ marginTop: "16px" }}>
+        <div className="card-header">
+          <div className="card-title">Recent Anomaly Events Timeline</div>
         </div>
-        <div className="p-4">
-          <div className="anomaly-timeline" style={{borderLeft: "2px solid #334155", paddingLeft: "20px", marginLeft: "10px", display: "flex", flexDirection: "column", gap: "20px"}}>
-            {ANOMALY_EVENTS.map((event, i) => (
-              <div key={i} className="timeline-item" style={{position: "relative"}}>
-                <div className={`timeline-dot ${event.sev}`} style={{
-                  position: "absolute", left: "-26px", top: "4px", width: "12px", height: "12px", 
-                  borderRadius: "50%", background: event.sev === 'critical' ? '#ef4444' : event.sev === 'warning' ? '#f59e0b' : '#3b82f6',
-                  border: "2px solid #0f172a"
-                }}></div>
-                <div className="timeline-time" style={{fontSize: "0.8rem", color: "#94a3b8", marginBottom: "4px"}}>{event.ts}</div>
-                <div className="timeline-content" style={{background: "#1e293b", padding: "12px", borderRadius: "6px"}}>
-                  <div style={{fontWeight: "600", marginBottom: "4px"}}>{event.msg}</div>
-                  <div style={{fontSize: "0.85rem", color: "#64748b"}}>Detected by: {event.model}</div>
+        <div className="card-body" style={{ padding: "0 20px 16px" }}>
+          {ANOMALY_EVENTS.map((event, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start',
+                padding: '10px 0',
+                borderBottom: i === ANOMALY_EVENTS.length - 1 ? 'none' : '1px solid var(--border)'
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: 'var(--text-muted)',
+                  minWidth: '110px',
+                  marginTop: '2px'
+                }}
+              >
+                {event.ts}
+              </div>
+              <div
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: sevColors[event.sev] || 'var(--accent)',
+                  marginTop: '5px',
+                  flexShrink: 0
+                }}
+              ></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {event.msg}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Detected by: <span style={{ color: 'var(--accent)' }}>{event.model}</span>
                 </div>
               </div>
-            ))}
-          </div>
+              <span className={`badge ${event.sev === 'critical' ? 'rose' : event.sev === 'warning' ? 'amber' : 'blue'}`}>
+                {event.sev}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </>

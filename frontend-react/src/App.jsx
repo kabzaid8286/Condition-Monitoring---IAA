@@ -12,12 +12,17 @@ function App() {
     setIsAuthenticated(true);
   };
 
+  const handleLogout = () => {
+    setUserRole(null);
+    setIsAuthenticated(false);
+  };
+
   return (
     <>
       {!isAuthenticated ? (
         <LoginPage onLogin={handleLogin} />
       ) : (
-        <DashboardPage userRole={userRole} />
+        <DashboardPage userRole={userRole} onLogout={handleLogout} />
       )}
     </>
   );
