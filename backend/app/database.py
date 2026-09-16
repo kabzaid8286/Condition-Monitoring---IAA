@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import text
 from app.config import settings
 
 engine = create_async_engine(
@@ -23,12 +24,17 @@ async def get_db():
             await session.close()
 
 async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        
-        # Create TimescaleDB hypertable if not exists
-        await conn.execute(
-            """
-            SELECT create_hypertable('sensor_readings', 'time', if_not_exists => TRUE);
-            """
-        )
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            
+            # Create TimescaleDB hypertable if available
+            try:
+                await conn.execute(
+                    text("SELECT create_hypertable('sensor_readings', 'time', if_not_exists => TRUE);")
+                )
+            except Exception:
+                # TimescaleDB extension or table already configured
+                pass
+    except Exception as e:
+        print(f"Database connection notice: {e}")
