@@ -9,6 +9,7 @@ import AiAssistantView from '../views/AiAssistantView';
 import ComparisonView from '../views/ComparisonView';
 import OverviewView from '../views/OverviewView';
 import TestDesignView from '../views/TestDesignView';
+import AnalysisView from '../views/AnalysisView';
 import useSensorData from '../hooks/useSensorData';
 
 export default function DashboardPage({ userRole, onLogout }) {
@@ -30,6 +31,7 @@ export default function DashboardPage({ userRole, onLogout }) {
           {activeView === 'ml-models' && <MlModelsView data={data} />}
           {activeView === 'alerts' && <AlertsView />}
           {activeView === 'comparison' && <ComparisonView data={data} />}
+          {activeView === 'analysis' && <AnalysisView data={data} activeAsset={activeAsset} />}
           {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
         </main>
       </div>

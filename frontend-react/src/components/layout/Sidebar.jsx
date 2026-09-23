@@ -55,6 +55,12 @@ export default function Sidebar({ userRole, activeView, setActiveView, onLogout 
       >
         <span className="nav-item-icon">⚖️</span>Asset Comparison
       </div>
+      <div 
+        className={`nav-item ${activeView === 'analysis' ? 'active' : ''}`}
+        onClick={() => setActiveView('analysis')}
+      >
+        <span className="nav-item-icon">📉</span>Extended Analysis
+      </div>
       
       <div className="nav-section-label">Assistant</div>
       <div 
