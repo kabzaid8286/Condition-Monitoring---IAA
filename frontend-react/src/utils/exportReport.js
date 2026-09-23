@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { iaaLogoBase64, hsAalenLogoBase64 } from './logos';
 
-export function exportCSV(data, fileName = 'IAA_Asset_Report.csv') {
+export function exportCSV(data, asset = {name: 'Test Rig A'}, fileName = 'IAA_Asset_Report.csv') {
   let csv = "Timestamp,Vibration_RMS,Temperature,RPM,Anomaly_Score\n";
   data.forEach(r => {
     csv += `${r.timestamp},${r.vibration},${r.temp},${r.rpm},${r.anomaly}\n`;
@@ -13,15 +13,15 @@ export function exportCSV(data, fileName = 'IAA_Asset_Report.csv') {
   link.click();
 }
 
-export function exportJSON(data, fileName = 'IAA_Asset_Payload.json') {
-  const payload = JSON.stringify({ asset: "Test Rig A", generatedAt: new Date().toISOString(), records: data }, null, 2);
+export function exportJSON(data, asset = {name: 'Test Rig A'}, fileName = 'IAA_Asset_Payload.json') {
+  const payload = JSON.stringify({ asset: asset.name, generatedAt: new Date().toISOString(), records: data }, null, 2);
   const link = document.createElement("a"); 
   link.href = encodeURI("data:application/json;charset=utf-8," + payload);
   link.download = fileName; 
   link.click();
 }
 
-export function exportPDF(data, fileName = 'IAA_Executive_Report.pdf') {
+export function exportPDF(data, asset = {name: 'Test Rig A', label: 'Drive Train'}, fileName = 'IAA_Executive_Report.pdf') {
   try {
     const doc = new jsPDF();
     
@@ -56,7 +56,7 @@ export function exportPDF(data, fileName = 'IAA_Executive_Report.pdf') {
 
     doc.setFontSize(12);
     doc.setTextColor(40);
-    doc.text("Asset: Test Rig A — Drive Train", 14, 48);
+    doc.text(`Asset: ${asset.name} — ${asset.label}`, 14, 48);
     doc.text("Status: Caution (Warning)", 14, 54);
     doc.text("Latest AI Diagnostics: Minor outer race defect signature detected.", 14, 60);
     

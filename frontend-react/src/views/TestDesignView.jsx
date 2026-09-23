@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAssets } from '../contexts/AssetContext';
+import { toast } from '../utils/toast';
 
 export default function TestDesignView({ activeAsset, setActiveAsset }) {
   const [activeTab, setActiveTab] = useState('component');
@@ -28,7 +29,7 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
       basetemp: parseFloat(formData.baseTemp),
       baserpm: parseFloat(formData.rpm)
     });
-    alert(`Configuration saved for ${formData.machineName}! It is now available in the system.`);
+    toast(`Configuration saved for ${formData.machineName}! It is now available in the system.`);
   };
 
   const handleDelete = (id) => {

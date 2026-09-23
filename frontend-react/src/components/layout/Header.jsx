@@ -22,9 +22,10 @@ export default function Header({ userRole, activeAsset, setActiveAsset }) {
 
   const handleExport = (type) => {
     setDropdownOpen(false);
-    if (type === 'pdf') exportPDF(sampleData);
-    if (type === 'csv') exportCSV(sampleData);
-    if (type === 'json') exportJSON(sampleData);
+    const active = assets[activeAsset] || { name: 'Unknown', label: 'Unknown' };
+    if (type === 'pdf') exportPDF(sampleData, active);
+    if (type === 'csv') exportCSV(sampleData, active);
+    if (type === 'json') exportJSON(sampleData, active);
   };
 
   return (
