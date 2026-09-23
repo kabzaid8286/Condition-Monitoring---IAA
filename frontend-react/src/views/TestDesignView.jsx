@@ -14,6 +14,23 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
     torque: 50.0
   });
 
+  const [sysData, setSysData] = useState({
+    loadProfile: 'steady',
+    misalignment: 0,
+    ambientTemp: 22.0,
+    foundation: 'rigid'
+  });
+
+  const handleSysChange = (e) => {
+    const { name, value } = e.target;
+    setSysData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSysSave = (e) => {
+    e.preventDefault();
+    toast('System-level parameters applied globally to all components.');
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -163,10 +180,82 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
         )}
 
         {activeTab === 'system' && (
-          <div className="card-body" style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-            <span style={{ fontSize: '48px' }}>🏗️</span>
-            <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>System Level Testing Module</div>
-            <div style={{ color: 'var(--text-muted)' }}>Multi-asset interaction testing coming soon...</div>
+          <div className="card-body">
+            <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Global System Parameters</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '14px' }}>
+              Configure environmental and multi-component interaction variables that affect the entire test rig.
+            </p>
+
+            <form onSubmit={handleSysSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '600px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Duty Cycle / Load Profile</label>
+                <select 
+                  name="loadProfile" 
+                  value={sysData.loadProfile} 
+                  onChange={handleSysChange} 
+                  style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                >
+                  <option value="steady">Steady State (Nominal Load)</option>
+                  <option value="ramp">Ramp-Up Test</option>
+                  <option value="cyclic">Cyclic Loading (Fatigue)</option>
+                  <option value="estop">Emergency Stop Simulation</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  Coupling Misalignment Factor: {sysData.misalignment}%
+                </label>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="15" 
+                  name="misalignment" 
+                  value={sysData.misalignment} 
+                  onChange={handleSysChange} 
+                />
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Affects vibration transmission between Motor and Gearbox.</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Ambient Temp (°C)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    name="ambientTemp" 
+                    value={sysData.ambientTemp} 
+                    onChange={handleSysChange} 
+                    style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Foundation Stiffness</label>
+                  <select 
+                    name="foundation" 
+                    value={sysData.foundation} 
+                    onChange={handleSysChange} 
+                    style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                  >
+                    <option value="rigid">Rigid (Standard)</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="soft">Soft (Increases baseline vibration)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-glass)', padding: '16px', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Projected System Health Impact</div>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: sysData.misalignment > 5 ? 'var(--amber)' : 'var(--green)' }}>
+                    {100 - (sysData.misalignment * 2) - (sysData.foundation === 'soft' ? 10 : 0)}%
+                  </div>
+                </div>
+                <button type="submit" className="btn" style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
+                  Apply System Profile
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>
