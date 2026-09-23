@@ -15,7 +15,7 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
     
     let now = new Date();
     for(let i = 60; i >= 0; i--) {
-      let t = new Date(now.getTime() - i * 1000);
+      let t = new Date(now.getTime() - i * 10000);
       initLabels.push(t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       
       initVibX.push((Math.random() * 2 + assetBase.basevib - 1).toFixed(2));
@@ -54,7 +54,7 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
     
     let now = new Date();
     for(let i = 60; i >= 0; i--) {
-      let t = new Date(now.getTime() - i * 1000);
+      let t = new Date(now.getTime() - i * 10000);
       initLabels.push(t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       
       initVibX.push((Math.random() * 2 + assetBase.basevib - 1).toFixed(2));
@@ -116,7 +116,7 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
           rpm: newRpm
         };
       });
-    }, 1000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [activeAsset]); // Re-run effect when activeAsset changes
