@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ASSETS } from '../data/mockData';
+import { useAssets } from '../contexts/AssetContext';
 
 export default function useSensorData(activeAsset = 'test-rig-a') {
-  const assetBase = ASSETS[activeAsset] || ASSETS['test-rig-a'];
+  const { assets } = useAssets();
+  const assetBase = assets[activeAsset] || assets['test-rig-a'];
 
   const [data, setData] = useState(() => {
     const initLabels = [];

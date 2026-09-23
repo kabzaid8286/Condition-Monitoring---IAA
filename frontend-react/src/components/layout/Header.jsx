@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { exportCSV, exportJSON, exportPDF } from '../../utils/exportReport';
-import { ASSETS } from '../../data/mockData';
+import { useAssets } from '../../contexts/AssetContext';
 
 export default function Header({ userRole, activeAsset, setActiveAsset }) {
   const lbl = { user: 'User', admin: 'Admin' };
@@ -9,7 +9,7 @@ export default function Header({ userRole, activeAsset, setActiveAsset }) {
   
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [manualAlarm, setManualAlarm] = useState(false);
-
+  const { assets } = useAssets();
   const sampleData = useMemo(() => {
     const now = Date.now();
     return [
@@ -51,7 +51,7 @@ export default function Header({ userRole, activeAsset, setActiveAsset }) {
       <div style={{display: "flex", alignItems: "center", gap: "10px", flex: 1}}>
         <div className="asset-select-wrapper">
           <select className="asset-select" value={activeAsset} onChange={(e) => setActiveAsset(e.target.value)}>
-            {Object.entries(ASSETS).map(([id, asset]) => (
+            {Object.entries(assets).map(([id, asset]) => (
               <option key={id} value={id}>{asset.name} — {asset.label}</option>
             ))}
           </select>

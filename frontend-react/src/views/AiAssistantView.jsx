@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AI_ANSWERS, ASSETS } from '../data/mockData';
+import { AI_ANSWERS } from '../data/mockData';
+import { useAssets } from '../contexts/AssetContext';
 
 function formatMessageText(text) {
   // Check if text has markdown table
@@ -87,7 +88,8 @@ function formatMessageText(text) {
 }
 
 export default function AiAssistantView({ activeAsset = 'test-rig-a' }) {
-  const assetName = ASSETS[activeAsset]?.name || 'Test Rig A';
+  const { assets } = useAssets();
+  const assetName = assets[activeAsset]?.name || 'Test Rig A';
   const now = () => new Date().toLocaleTimeString('en-GB');
 
   const [messages, setMessages] = useState([

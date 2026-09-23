@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { ASSETS } from '../data/mockData';
+import { useAssets } from '../contexts/AssetContext';
 import '../components/charts/ChartConfig';
 
 export default function ComparisonView() {
+  const { assets } = useAssets();
   // Generate comparative historical series for all assets
   const chartData = useMemo(() => {
     const timeLabels = Array.from({ length: 40 }, (_, i) => `${i * 2}m ago`).reverse();
@@ -14,7 +15,7 @@ export default function ComparisonView() {
       'gearbox-02': '#f43f5e'
     };
 
-    const datasets = Object.entries(ASSETS).map(([key, a], ci) => {
+    const datasets = Object.entries(assets).map(([key, a], ci) => {
       const data = Array.from({ length: 40 }, (_, i) => {
         const wave = Math.sin(i * 0.2 + ci * 1.5) * 0.35;
         const noise = (Math.sin(i * 4.3 + ci * 2.1) * 0.15);
@@ -84,7 +85,7 @@ export default function ComparisonView() {
       </div>
 
       <div className="comparison-grid" id="comparison-grid" style={{ marginTop: '20px' }}>
-        {Object.entries(ASSETS).map(([key, a]) => {
+        {Object.entries(assets).map(([key, a]) => {
           const vib = a.basevib.toFixed(2);
           const temp = a.basetemp.toFixed(1);
           const rpm = Math.round(a.baserpm);

@@ -10,6 +10,7 @@ import ComparisonView from '../views/ComparisonView';
 import OverviewView from '../views/OverviewView';
 import TestDesignView from '../views/TestDesignView';
 import useSensorData from '../hooks/useSensorData';
+import { AssetProvider } from '../contexts/AssetContext';
 
 export default function DashboardPage({ userRole, onLogout }) {
   const [activeView, setActiveView] = useState('overview');
@@ -17,22 +18,24 @@ export default function DashboardPage({ userRole, onLogout }) {
   const { data, kpis } = useSensorData(activeAsset);
 
   return (
-    <div id="app" className="visible">
-      <Header userRole={userRole} activeAsset={activeAsset} setActiveAsset={setActiveAsset} />
-      <div className="app-body">
-        <Sidebar userRole={userRole} activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
-        
-        <main className="main-content">
-          {activeView === 'test-design' && userRole === 'admin' && <TestDesignView />}
-          {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
-          {activeView === 'realtime' && <LiveTelemetryView data={data} />}
-          {activeView === 'historical' && <HistoricalDataView data={data} />}
-          {activeView === 'ml-models' && <MlModelsView data={data} />}
-          {activeView === 'alerts' && <AlertsView />}
-          {activeView === 'comparison' && <ComparisonView data={data} />}
-          {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
-        </main>
+    <AssetProvider>
+      <div id="app" className="visible">
+        <Header userRole={userRole} activeAsset={activeAsset} setActiveAsset={setActiveAsset} />
+        <div className="app-body">
+          <Sidebar userRole={userRole} activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
+          
+          <main className="main-content">
+            {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={setActiveAsset} />}
+            {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
+            {activeView === 'realtime' && <LiveTelemetryView data={data} />}
+            {activeView === 'historical' && <HistoricalDataView data={data} />}
+            {activeView === 'ml-models' && <MlModelsView data={data} />}
+            {activeView === 'alerts' && <AlertsView />}
+            {activeView === 'comparison' && <ComparisonView data={data} />}
+            {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
+          </main>
+        </div>
       </div>
-    </div>
+    </AssetProvider>
   );
 }

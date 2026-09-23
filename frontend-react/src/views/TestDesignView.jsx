@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useAssets } from '../contexts/AssetContext';
 
-export default function TestDesignView() {
+export default function TestDesignView({ activeAsset, setActiveAsset }) {
   const [activeTab, setActiveTab] = useState('component');
+  const { assets, addAsset, removeAsset } = useAssets();
   
   const [formData, setFormData] = useState({
     machineName: 'Custom Rig X',
@@ -18,9 +20,25 @@ export default function TestDesignView() {
 
   const handleSave = (e) => {
     e.preventDefault();
-    // For now, just a placeholder action
-    alert(`Configuration saved for ${formData.machineName}!\n\nVibration: ${formData.baseVib} mm/s\nTemperature: ${formData.baseTemp} °C\nRPM: ${formData.rpm}\nTorque: ${formData.torque} Nm`);
+    const id = formData.machineName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    addAsset(id, {
+      name: formData.machineName,
+      label: 'Custom Configuration',
+      basevib: parseFloat(formData.baseVib),
+      basetemp: parseFloat(formData.baseTemp),
+      baserpm: parseFloat(formData.rpm)
+    });
+    alert(`Configuration saved for ${formData.machineName}! It is now available in the system.`);
   };
+
+  const handleDelete = (id) => {
+    removeAsset(id);
+    if (activeAsset === id) {
+      setActiveAsset('test-rig-a');
+    }
+  };
+
+  const customAssets = Object.entries(assets).filter(([id, a]) => a.isCustom);
 
   return (
     <>
@@ -116,6 +134,28 @@ export default function TestDesignView() {
                 </button>
               </div>
             </form>
+
+            {customAssets.length > 0 && (
+              <div style={{ marginTop: '40px' }}>
+                <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Manage Custom Machines</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '600px' }}>
+                  {customAssets.map(([id, a]) => (
+                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Vib: {a.basevib} | Temp: {a.basetemp} | RPM: {a.baserpm}</div>
+                      </div>
+                      <button 
+                        onClick={() => handleDelete(id)}
+                        style={{ background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
