@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { exportCSV, exportJSON, exportPDF } from '../../utils/exportReport';
 import { useAssets } from '../../contexts/AssetContext';
 
-export default function Header({ userRole, activeAsset, setActiveAsset }) {
+export default function Header({ userRole, activeAsset, setActiveAsset, data }) {
   const lbl = { user: 'User', admin: 'Admin' };
   const clr = { user: '#3b82f6', admin: '#f43f5e' };
   const ini = { user: 'U', admin: 'A' };
@@ -10,22 +10,24 @@ export default function Header({ userRole, activeAsset, setActiveAsset }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [manualAlarm, setManualAlarm] = useState(false);
   const { assets } = useAssets();
-  const sampleData = useMemo(() => {
-    const now = Date.now();
-    return [
-      { timestamp: new Date(now).toLocaleString(), vibration: 2.4, temp: 55.1, rpm: 1490, anomaly: 0.12 },
-      { timestamp: new Date(now - 1000).toLocaleString(), vibration: 2.5, temp: 55.1, rpm: 1491, anomaly: 0.13 },
-      { timestamp: new Date(now - 2000).toLocaleString(), vibration: 2.4, temp: 55.2, rpm: 1490, anomaly: 0.12 },
-      { timestamp: new Date(now - 3000).toLocaleString(), vibration: 11.2, temp: 57.1, rpm: 1485, anomaly: 0.88, note: "FAULT" }
-    ];
-  }, []);
+  const exportData = useMemo(() => {
+    if (!data || !data.labels) return [];
+    
+    return data.labels.map((label, index) => ({
+      timestamp: label,
+      vibration: parseFloat(data.vibX[index]) || 0,
+      temp: parseFloat(data.temp[index]) || 0,
+      rpm: parseFloat(data.rpm[index]) || 0,
+      anomaly: (parseFloat(data.vibX[index]) / 10) || 0 // Simulated anomaly score
+    })).reverse();
+  }, [data]);
 
   const handleExport = (type) => {
     setDropdownOpen(false);
     const active = assets[activeAsset] || { name: 'Unknown', label: 'Unknown' };
-    if (type === 'pdf') exportPDF(sampleData, active);
-    if (type === 'csv') exportCSV(sampleData, active);
-    if (type === 'json') exportJSON(sampleData, active);
+    if (type === 'pdf') exportPDF(exportData, active);
+    if (type === 'csv') exportCSV(exportData, active);
+    if (type === 'json') exportJSON(exportData, active);
   };
 
   return (

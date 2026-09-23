@@ -33,10 +33,12 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
   };
 
   const handleDelete = (id) => {
+    const assetToDelete = assets[id];
     removeAsset(id);
     if (activeAsset === id) {
       setActiveAsset('test-rig-a');
     }
+    toast(`${assetToDelete ? assetToDelete.name : 'Machine'} deleted successfully.`, 'error');
   };
 
   const customAssets = Object.entries(assets).filter(([id, a]) => a.isCustom);

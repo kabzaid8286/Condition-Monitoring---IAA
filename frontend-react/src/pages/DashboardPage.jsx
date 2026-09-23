@@ -18,7 +18,7 @@ export default function DashboardPage({ userRole, onLogout }) {
 
   return (
     <div id="app" className="visible">
-      <Header userRole={userRole} activeAsset={activeAsset} setActiveAsset={setActiveAsset} />
+      <Header userRole={userRole} activeAsset={activeAsset} setActiveAsset={setActiveAsset} data={data} />
       <div className="app-body">
         <Sidebar userRole={userRole} activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
         
