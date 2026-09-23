@@ -1,8 +1,20 @@
 import React from 'react';
 
-export default function Sidebar({ activeView, setActiveView, onLogout }) {
+export default function Sidebar({ userRole, activeView, setActiveView, onLogout }) {
   return (
     <nav className="sidebar">
+      {userRole === 'admin' && (
+        <>
+          <div className="nav-section-label">Test Design</div>
+          <div 
+            className={`nav-item ${activeView === 'test-design' ? 'active' : ''}`}
+            onClick={() => setActiveView('test-design')}
+          >
+            <span className="nav-item-icon">⚙️</span>Test Design Config
+          </div>
+        </>
+      )}
+
       <div className="nav-section-label">Monitoring</div>
       <div 
         className={`nav-item ${activeView === 'overview' ? 'active' : ''}`}
