@@ -14,7 +14,7 @@ Develop a condition monitoring system for test rigs / industrial assets (IAA - I
 - **ML & Background Tasks**: Celery + Redis (Python) for anomaly detection and RUL prognostics.
 
 ## 3. Current Progress Snapshot
-- **React Frontend (`frontend-react/`)**: UI is completely built using mock data (`mockData.js`). 
+- **React Frontend (`frontend-react/`)**: Fully developed SPA. Includes Overview, Real-Time, Historical, ML Models, Alerts, Asset Comparison, Extended Analysis (charts + stats), Test Design (Component & System level), and complete Auth flow (Login, Register with OTP, Forgot Password).
 - **Backend Infrastructure**: Docker containers (TimescaleDB, Redis, Mosquitto) are running.
 - **Backend API (FastAPI)**: Implemented! Router endpoints exist for telemetry, models, and alerts. `TelemetryHub` WebSocket service is set up in `mqtt_service.py` to stream live MQTT data.
 
