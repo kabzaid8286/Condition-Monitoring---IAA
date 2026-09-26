@@ -23,7 +23,7 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <div id="login-screen">
-      <form className="login-card" onSubmit={handleAuth}>
+      <div className="login-card">
         <div className="login-logo">
           <img src="https://www.hs-aalen.de/_assets/23c048c4e278024490c6ac1b855e5de4/img/hs-aalen-logo.svg" alt="HS Aalen" style={{height: "40px", borderRadius: "4px"}} />
           <div>
@@ -57,10 +57,18 @@ export default function LoginPage({ onLogin }) {
             required
           />
         </div>
-        <button type="submit" className="login-btn" style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))"}}>
-          Sign In
+        <button className="login-btn" onClick={() => onLogin('user')} style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))"}}>
+          <span className="role-icon">👤</span> Login as User
         </button>
-      </form>
+        <button className="login-btn" onClick={() => onLogin('admin')} style={{marginTop:"12px", background:"linear-gradient(135deg, var(--rose), var(--orange))"}}>
+          <span className="role-icon">🛡️</span> Login as Admin
+        </button>
+
+        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center', fontSize: '13px' }}>
+          <a href="#" onClick={(e) => { e.preventDefault(); toast('Password reset link sent to your email.'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Forgot Password?</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); toast('Account creation is restricted to administrators.'); }} style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600 }}>Create an account</a>
+        </div>
+      </div>
     </div>
   );
 }
