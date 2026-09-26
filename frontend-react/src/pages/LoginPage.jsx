@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from '../utils/toast';
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin, onNavigate }) {
   const [credentials, setCredentials] = useState({ id: '', password: '' });
   
   const handleChange = (e) => {
@@ -9,15 +9,19 @@ export default function LoginPage({ onLogin }) {
     setCredentials(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleAuth = (e) => {
-    e.preventDefault();
-    // Temporary mock logic for frontend until we connect FastAPI
-    if (credentials.id === 'admin' && credentials.password === 'admin123') {
-      onLogin('admin');
-    } else if (credentials.id === 'user' && credentials.password === 'user123') {
-      onLogin('user');
-    } else {
-      toast('Invalid ID or Password. Try admin/admin123 or user/user123', 'error');
+  const attemptLogin = (role) => {
+    if (role === 'admin') {
+      if (credentials.id === 'admin' && credentials.password === 'admin123') {
+        onLogin('admin');
+      } else {
+        toast('Invalid Admin credentials.', 'error');
+      }
+    } else if (role === 'user') {
+      if (credentials.id === 'user' && credentials.password === 'user123') {
+        onLogin('user');
+      } else {
+        toast('Invalid User credentials.', 'error');
+      }
     }
   };
 
@@ -57,16 +61,16 @@ export default function LoginPage({ onLogin }) {
             required
           />
         </div>
-        <button className="login-btn" onClick={() => onLogin('user')} style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))"}}>
+        <button className="login-btn" onClick={(e) => { e.preventDefault(); attemptLogin('user'); }} style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))"}}>
           <span className="role-icon">👤</span> Login as User
         </button>
-        <button className="login-btn" onClick={() => onLogin('admin')} style={{marginTop:"12px", background:"linear-gradient(135deg, var(--rose), var(--orange))"}}>
+        <button className="login-btn" onClick={(e) => { e.preventDefault(); attemptLogin('admin'); }} style={{marginTop:"12px", background:"linear-gradient(135deg, var(--rose), var(--orange))"}}>
           <span className="role-icon">🛡️</span> Login as Admin
         </button>
 
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center', fontSize: '13px' }}>
-          <a href="#" onClick={(e) => { e.preventDefault(); toast('Password reset link sent to your email.'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Forgot Password?</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); toast('Account creation is restricted to administrators.'); }} style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600 }}>Create an account</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('forgot-password'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Forgot Password?</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('register'); }} style={{ color: 'var(--blue)', textDecoration: 'none', fontWeight: 600 }}>Create an account</a>
         </div>
       </div>
     </div>
