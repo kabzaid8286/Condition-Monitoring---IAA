@@ -4,7 +4,7 @@ from uuid import UUID
 from datetime import datetime
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     full_name: str
     role: str = "viewer"
 
@@ -12,7 +12,7 @@ class UserCreate(UserBase):
     password: str
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
     password: Optional[str] = None
@@ -27,7 +27,7 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class Token(BaseModel):

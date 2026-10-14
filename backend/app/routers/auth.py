@@ -79,15 +79,21 @@ async def login(
 
 @router.post("/register", response_model=UserResponse)
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).filter(User.email == user_in.email))
+    clean_identifier = user_in.email.strip().lower()
+    result = await db.execute(
+        select(User).filter(
+            (User.email.ilike(clean_identifier)) |
+            (User.email.ilike(f"{clean_identifier}@iaa.de"))
+        )
+    )
     if result.scalars().first():
-        raise BadRequestException("Email already registered")
+        raise BadRequestException("An account is already registered with this username or email")
         
     user = User(
-        email=user_in.email,
+        email=clean_identifier,
         hashed_password=get_password_hash(user_in.password),
-        full_name=user_in.full_name,
-        role=user_in.role
+        full_name=user_in.full_name or clean_identifier,
+        role=user_in.role or "viewer"
     )
     db.add(user)
     await db.commit()

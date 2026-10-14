@@ -32,25 +32,58 @@ export default function LoginPage({ onLogin, onNavigate }) {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.access_token) {
-          localStorage.setItem('auth_token', data.access_token);
+        
+        // Strict role validation based on which button was clicked
+        if (requestedRole === 'admin') {
+          if (data.role !== 'admin') {
+            toast('Access denied. Administrator privileges required to log in as Admin.', 'error');
+            return;
+          }
+          if (data.access_token) {
+            localStorage.setItem('auth_token', data.access_token);
+          }
+          onLogin('admin');
+          return;
+        } else {
+          // requestedRole === 'user'
+          if (data.role === 'admin') {
+            toast('Administrator account detected. Please use the "Login as Admin" button.', 'info');
+            return;
+          }
+          if (data.access_token) {
+            localStorage.setItem('auth_token', data.access_token);
+          }
+          onLogin('user');
+          return;
         }
-        const effectiveRole = data.role === 'admin' ? 'admin' : (requestedRole === 'admin' && data.role === 'admin' ? 'admin' : 'user');
-        onLogin(effectiveRole);
-        return;
       } else {
         const errJson = await response.json().catch(() => ({}));
-        toast(errJson.detail || 'Invalid credentials.', 'error');
+        const errorMsg = typeof errJson.detail === 'string' 
+          ? errJson.detail 
+          : (Array.isArray(errJson.detail) ? errJson.detail.map(d => d.msg).join('; ') : 'Invalid credentials.');
+        toast(errorMsg, 'error');
         return;
       }
     } catch (err) {
       console.warn('Backend auth unreachable, checking local credentials fallback:', err);
-      if (requestedRole === 'admin' && credentials.id === 'admin' && credentials.password === 'admin123') {
-        onLogin('admin');
-      } else if (requestedRole === 'user' && credentials.id === 'user' && credentials.password === 'user123') {
-        onLogin('user');
+      const cleanId = (credentials.id || '').trim().toLowerCase();
+      if (requestedRole === 'admin') {
+        if (cleanId === 'admin' && credentials.password === 'admin123') {
+          onLogin('admin');
+        } else if (cleanId === 'user') {
+          toast('Access denied. Administrator privileges required to log in as Admin.', 'error');
+        } else {
+          toast('Invalid administrator credentials or backend unavailable.', 'error');
+        }
       } else {
-        toast('Invalid credentials or backend unavailable.', 'error');
+        // requestedRole === 'user'
+        if (cleanId === 'admin') {
+          toast('Administrator account detected. Please use the "Login as Admin" button.', 'info');
+        } else if (cleanId === 'user' && credentials.password === 'user123') {
+          onLogin('user');
+        } else {
+          toast('Invalid user credentials or backend unavailable.', 'error');
+        }
       }
     } finally {
       setIsLoading(false);

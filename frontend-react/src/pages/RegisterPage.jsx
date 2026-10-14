@@ -2,61 +2,59 @@ import React, { useState } from 'react';
 import { toast } from '../utils/toast';
 
 export default function RegisterPage({ onNavigate }) {
-  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
+    identifier: '',
+    fullName: '',
     password: '',
-    confirmPassword: '',
-    otp: ''
+    confirmPassword: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCreate = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
+    if (formData.password.length < 6) {
+      toast('Password must be at least 6 characters long.', 'error');
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       toast('Passwords do not match.', 'error');
       return;
     }
-    // Simulate sending OTP
-    toast('OTP sent to your email.');
-    setStep(2);
-  };
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (formData.otp.length >= 4) {
-      const host = window.location.hostname || 'localhost';
-      try {
-        const response = await fetch(`http://${host}:8000/api/v1/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            full_name: formData.username,
-            role: 'viewer'
-          })
-        });
+    setIsLoading(true);
+    const host = window.location.hostname || 'localhost';
+    try {
+      const response = await fetch(`http://${host}:8000/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.identifier.trim(),
+          full_name: formData.fullName.trim() || formData.identifier.trim(),
+          password: formData.password,
+          role: 'viewer'
+        })
+      });
 
-        if (response.ok) {
-          toast('Account created and registered in database!');
-          onNavigate('login');
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          toast(errData.detail || 'Registration failed or email exists.', 'error');
-        }
-      } catch (err) {
-        console.warn('Backend unavailable, continuing with offline account creation:', err);
-        toast('Account created successfully (Offline mode)!');
+      if (response.ok) {
+        toast('Account successfully created! You can now log in.');
         onNavigate('login');
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        const errorMsg = typeof errData.detail === 'string'
+          ? errData.detail
+          : (Array.isArray(errData.detail) ? errData.detail.map(d => d.msg).join('; ') : 'Registration failed.');
+        toast(errorMsg, 'error');
       }
-    } else {
-      toast('Invalid OTP code. Please enter 4 digits.', 'error');
+    } catch (err) {
+      console.warn('Backend registration failed:', err);
+      toast('Backend service unreachable. Please ensure the server is running.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -71,41 +69,64 @@ export default function RegisterPage({ onNavigate }) {
           </div>
         </div>
 
-        {step === 1 ? (
-          <form onSubmit={handleCreate}>
-            <div className="form-group">
-              <label className="form-label">Email address</label>
-              <input className="form-input" type="email" name="email" placeholder="you@iaa.de" value={formData.email} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Username</label>
-              <input className="form-input" type="text" name="username" placeholder="Enter username" value={formData.username} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input className="form-input" type="password" name="password" placeholder="••••••••" value={formData.password} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Confirm Password</label>
-              <input className="form-input" type="password" name="confirmPassword" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} required />
-            </div>
-            <button type="submit" className="login-btn" style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))"}}>
-              Create Account
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify}>
-            <div className="login-title" style={{ marginTop: '10px', fontSize: '18px' }}>Verify your Email</div>
-            <div className="login-subtitle">We sent a verification code to {formData.email}</div>
-            <div className="form-group" style={{ marginTop: '20px' }}>
-              <label className="form-label">Enter OTP</label>
-              <input className="form-input" type="text" name="otp" placeholder="1234" value={formData.otp} onChange={handleChange} required style={{ textAlign: 'center', fontSize: '20px', letterSpacing: '4px' }} />
-            </div>
-            <button type="submit" className="login-btn" style={{marginTop:"10px", background:"linear-gradient(135deg, var(--green), var(--teal))"}}>
-              Verify and Login
-            </button>
-          </form>
-        )}
+        <form onSubmit={handleRegister}>
+          <div className="form-group">
+            <label className="form-label">User ID or Email</label>
+            <input 
+              className="form-input" 
+              type="text" 
+              name="identifier" 
+              placeholder="e.g., testuser or test@iaa.de" 
+              value={formData.identifier} 
+              onChange={handleChange} 
+              required 
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Full Name</label>
+            <input 
+              className="form-input" 
+              type="text" 
+              name="fullName" 
+              placeholder="e.g., John Doe" 
+              value={formData.fullName} 
+              onChange={handleChange} 
+              required 
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Password (min 6 characters)</label>
+            <input 
+              className="form-input" 
+              type="password" 
+              name="password" 
+              placeholder="••••••••" 
+              value={formData.password} 
+              onChange={handleChange} 
+              required 
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Confirm Password</label>
+            <input 
+              className="form-input" 
+              type="password" 
+              name="confirmPassword" 
+              placeholder="••••••••" 
+              value={formData.confirmPassword} 
+              onChange={handleChange} 
+              required 
+            />
+          </div>
+          <button 
+            type="submit" 
+            className="login-btn" 
+            disabled={isLoading}
+            style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))", opacity: isLoading ? 0.7 : 1}}
+          >
+            {isLoading ? 'Creating Account...' : 'Create Account'}
+          </button>
+        </form>
 
         <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '13px' }}>
           <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('login'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
