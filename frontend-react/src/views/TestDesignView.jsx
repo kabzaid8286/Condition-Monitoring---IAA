@@ -9,9 +9,7 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
   const [formData, setFormData] = useState({
     machineName: 'Custom Rig X',
     baseVib: 2.5,
-    baseTemp: 45.0,
-    rpm: 1500,
-    torque: 50.0
+    baseTemp: 45.0
   });
 
   const [sysData, setSysData] = useState({
@@ -44,7 +42,7 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
       label: 'Custom Configuration',
       basevib: parseFloat(formData.baseVib),
       basetemp: parseFloat(formData.baseTemp),
-      baserpm: parseFloat(formData.rpm)
+      baserpm: 1500
     });
     toast(`Configuration saved for ${formData.machineName}! It is now available in the system.`);
   };
@@ -125,27 +123,6 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
                     style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Rotation Speed (RPM)</label>
-                  <input 
-                    type="number" 
-                    name="rpm" 
-                    value={formData.rpm} 
-                    onChange={handleChange} 
-                    style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Torque (Nm)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    name="torque" 
-                    value={formData.torque} 
-                    onChange={handleChange} 
-                    style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                  />
-                </div>
               </div>
 
               <div style={{ marginTop: '16px' }}>
@@ -163,7 +140,7 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
                     <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px' }}>
                       <div>
                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Vib: {a.basevib} | Temp: {a.basetemp} | RPM: {a.baserpm}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Base Vib: {a.basevib} mm/s | Base Temp: {a.basetemp} °C</div>
                       </div>
                       <button 
                         onClick={() => handleDelete(id)}

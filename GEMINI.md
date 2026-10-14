@@ -6,22 +6,24 @@
 Develop a condition monitoring system for test rigs / industrial assets (IAA - Institute of Drive and Automotive Engineering / HS Aalen). The system ingests sensor data (Vibration X/Y, Bearing Temperature, RPM) from a Raspberry Pi 5, stores it in TimescaleDB, applies ML anomaly detection/RUL prognostics, and displays it on a real-time responsive dashboard.
 
 ## 2. Architecture & Tech Stack
-- **Frontend**: React SPA (`frontend-react/`) using Vite, React 19, Chart.js, and a Vanilla CSS design system. *(Note: The original Vanilla JS prototype was deprecated and removed)*.
+- **Frontend**: React SPA (`frontend-react/`) using Vite, React 19, Chart.js, and a Vanilla CSS design system.
 - **Backend API**: Python (FastAPI on port 8000).
 - **Database**: TimescaleDB (PostgreSQL on port 5432) via Docker.
 - **Message Broker**: Eclipse Mosquitto (MQTT on port 1883) via Docker.
-- **Gateway**: Python script (`gateway/rpi_publisher.py`) meant for Raspberry Pi 5 to publish local hardware data.
+- **Hardware / Sensor Node**: Custom carrier board with a Seeed Studio XIAO microcontroller powered by dual coin-cell batteries, connected to MEMS vibration sensors and an industrial temperature probe. Runs C/C++ firmware operating on a duty-cycle (10-second burst acquisition every 5 minutes, followed by Deep Sleep to maximize battery life).
+- **Gateway**: Python script (`gateway/rpi_publisher.py`) on Raspberry Pi 5 to ingest serial data from the sensor node and publish to MQTT.
 - **ML & Background Tasks**: Celery + Redis (Python) for anomaly detection and RUL prognostics.
 
 ## 3. Current Progress Snapshot
-- **React Frontend (`frontend-react/`)**: Fully developed SPA. Includes Overview, Real-Time, Historical, ML Models, Alerts, Asset Comparison, Extended Analysis (charts + stats), Test Design (Component & System level), and complete Auth flow (Login, Register with OTP, Forgot Password).
-- **Backend Infrastructure**: Docker containers (TimescaleDB, Redis, Mosquitto) are running.
-- **Backend API (FastAPI)**: Implemented! Router endpoints exist for telemetry, models, and alerts. `TelemetryHub` WebSocket service is set up in `mqtt_service.py` to stream live MQTT data.
+- **React Frontend (`frontend-react/`)**: Fully developed SPA. Includes Overview, Real-Time, Historical, ML Models, Alerts, Asset Comparison, Extended Analysis, Test Design, and complete Auth flow.
+- **Real-Time WebSocket Integration**: React `useSensorData` hook connects to `ws://localhost:8000/api/v1/telemetry/ws` with dynamic status pill (`Live WS (RPi 5)` vs `Simulated` fallback).
+- **Backend Infrastructure**: Docker containers (TimescaleDB, Redis, Mosquitto) and FastAPI are running.
+- **End-to-End Pipeline**: Tested and verified from MQTT $\rightarrow$ FastAPI $\rightarrow$ WebSocket $\rightarrow$ React frontend.
 
-## 4. Current Phase: API Integration
-- The next step is to replace the mock data inside the React Frontend with live data.
-- **WebSocket:** React must connect to `ws://localhost:8000/api/v1/telemetry/ws` to receive real-time updates.
-- **HTTP APIs:** React must fetch historical data from `/api/v1/telemetry/history` and other endpoints instead of hardcoded arrays.
+## 4. Current Phase: API Integration & Microcontroller Firmware
+- **HTTP APIs**: Wire `/api/v1/telemetry/history` to Historical and Analysis charts.
+- **Authentication**: Wire Login/Register to PostgreSQL `users` table via FastAPI `/api/v1/auth/`.
+- **Microcontroller Firmware**: C/C++ sketch for Seeed Studio XIAO with 5-minute deep sleep timer and 10-second burst acquisition.
 
 ## 5. Safety & Development Rules
 - **No Destructive Overwrites**: Do not delete or overwrite existing working React components without explicit intention.

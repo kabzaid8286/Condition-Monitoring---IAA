@@ -65,6 +65,8 @@ class TelemetryHub:
                 "vibY": sensors.get("vibration_y", 0.0),
                 "temp": sensors.get("temperature", 0.0),
                 "rpm": sensors.get("rpm", 0.0),
+                "battery_pct": sensors.get("battery_pct", 100),
+                "burst_state": sensors.get("burst_state", "active"),
                 "time": payload.get("timestamp", datetime.now(timezone.utc).isoformat())
             }
 

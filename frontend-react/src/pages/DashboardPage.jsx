@@ -15,11 +15,19 @@ import useSensorData from '../hooks/useSensorData';
 export default function DashboardPage({ userRole, onLogout }) {
   const [activeView, setActiveView] = useState('overview');
   const [activeAsset, setActiveAsset] = useState('test-rig-a');
-  const { data, kpis } = useSensorData(activeAsset);
+  const { data, kpis, isConnected, connectionMode } = useSensorData(activeAsset);
 
   return (
     <div id="app" className="visible">
-      <Header userRole={userRole} activeAsset={activeAsset} setActiveAsset={setActiveAsset} data={data} />
+      <Header 
+        userRole={userRole} 
+        activeAsset={activeAsset} 
+        setActiveAsset={setActiveAsset} 
+        data={data} 
+        kpis={kpis}
+        isConnected={isConnected}
+        connectionMode={connectionMode}
+      />
       <div className="app-body">
         <Sidebar userRole={userRole} activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
         

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { exportCSV, exportJSON, exportPDF } from '../../utils/exportReport';
 import { useAssets } from '../../contexts/AssetContext';
 
-export default function Header({ userRole, activeAsset, setActiveAsset, data }) {
+export default function Header({ userRole, activeAsset, setActiveAsset, data, kpis = {}, isConnected = false, connectionMode = 'simulated' }) {
   const lbl = { user: 'User', admin: 'Admin' };
   const clr = { user: '#3b82f6', admin: '#f43f5e' };
   const ini = { user: 'U', admin: 'A' };
@@ -63,9 +63,25 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data }) 
           <div className="status-dot live"></div>
           <span>Nominal</span>
         </div>
-        <div className="status-pill" style={{background: "rgba(6,182,212,0.1)", color: "var(--cyan)", fontSize: "11px", padding: "4px 10px"}}>
-          <div className="status-dot" style={{background: "var(--cyan)", animation: "pulse-dot 1s infinite"}}></div>Live
-        </div>
+        {connectionMode === 'live' ? (
+          <div className="status-pill" title="Connected to FastAPI WebSocket telemetry hub" style={{background: "rgba(16,185,129,0.15)", color: "#10b981", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(16,185,129,0.3)"}}>
+            <div className="status-dot" style={{background: "#10b981", animation: "pulse-dot 1s infinite"}}></div>Live WS (RPi 5)
+          </div>
+        ) : (
+          <div className="status-pill" title="WebSocket offline - Running auto-simulation fallback" style={{background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(245,158,11,0.3)"}}>
+            <div className="status-dot" style={{background: "#f59e0b"}}></div>Simulated
+          </div>
+        )}
+        {kpis && kpis.battery !== undefined && (
+          <div className="status-pill" title={`Sensor Node Battery: ${kpis.battery}%`} style={{background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)", fontSize: "11px", padding: "4px 10px", border: "1px solid var(--border)"}}>
+            🔋 {kpis.battery}%
+          </div>
+        )}
+        {kpis && kpis.burstState === 'sleep' && (
+          <div className="status-pill" title="Microcontroller in Deep Sleep (Power Saving)" style={{background: "rgba(99,102,241,0.15)", color: "#818cf8", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(99,102,241,0.3)"}}>
+            💤 Deep Sleep
+          </div>
+        )}
       </div>
       
       <div className="header-actions">
