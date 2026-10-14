@@ -13,7 +13,7 @@
 - [x] Create Python publisher script for Raspberry Pi 5 (`gateway/rpi_publisher.py`)
 - [x] Implement WebSocket `TelemetryHub` in FastAPI for real-time streaming
 
-## Phase 3: Hardware Ingestion Pipeline & System Readiness (Current Phase)
+## Phase 3: Hardware Ingestion Pipeline & System Readiness (Completed)
 *Goal: Complete all backend, gateway, firmware sketch, and dashboard wiring so the platform is 100% ready the moment the microcontroller is plugged in.*
 - [x] Connect React `useSensorData` hook to FastAPI WebSockets.
 - [x] Implement robust reconnection logic for WebSockets in React (auto-fallback to local simulation when disconnected).
@@ -21,8 +21,8 @@
 - [x] **Gateway USB Serial Ingestion**: Upgraded `gateway/rpi_publisher.py` with plug-and-play USB Serial reader (`pyserial`) supporting macOS (`/dev/cu.usbmodem*`) and Linux (`/dev/ttyACM*`) to read incoming Seeed Studio XIAO data and publish to MQTT.
 - [x] **C/C++ Firmware Sketch**: Created the ready-to-flash Arduino sketch (`firmware/xiao_condition_node/xiao_condition_node.ino`) with 5-minute deep sleep timer and 10-second burst acquisition (vibration, temp, battery level).
 - [x] **Burst Telemetry & Battery UI**: Added battery percentage badge (`🔋 98%`) and low-power deep sleep status (`💤 Deep Sleep`) to the React header and dashboard.
-- [ ] **Historical Telemetry API**: Replace hardcoded historical data in React with Axios API calls to `/api/v1/telemetry/history` backed by TimescaleDB.
-- [ ] **Authentication**: Wire `LoginPage.jsx` & `RegisterPage.jsx` to FastAPI `/api/v1/auth/` and PostgreSQL `users` table.
+- [x] **Historical Telemetry API**: Connected `HistoricalDataView.jsx` to FastAPI `/api/v1/telemetry/history` for dynamic 1D, 7D, 30D time-series visualization.
+- [x] **Authentication**: Wired `LoginPage.jsx` & `RegisterPage.jsx` to FastAPI `/api/v1/auth/` backed by the PostgreSQL `users` table with Argon2 password hashing.
 
 ## Phase 4: Microcontroller Plug-in, Flashing & Live Rig Streaming (Next Milestone)
 *Goal: Connect the physical Seeed Studio XIAO board to Mac, flash the C code, and stream real sensor data.*

@@ -9,19 +9,51 @@ export default function LoginPage({ onLogin, onNavigate }) {
     setCredentials(prev => ({ ...prev, [name]: value }));
   };
 
-  const attemptLogin = (role) => {
-    if (role === 'admin') {
-      if (credentials.id === 'admin' && credentials.password === 'admin123') {
-        onLogin('admin');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const attemptLogin = async (requestedRole) => {
+    if (!credentials.id || !credentials.password) {
+      toast('Please enter both User ID and Password.', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    const host = window.location.hostname || 'localhost';
+
+    try {
+      const response = await fetch(`http://${host}:8000/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: credentials.id,
+          password: credentials.password
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.access_token) {
+          localStorage.setItem('auth_token', data.access_token);
+        }
+        const effectiveRole = data.role === 'admin' ? 'admin' : (requestedRole === 'admin' && data.role === 'admin' ? 'admin' : 'user');
+        onLogin(effectiveRole);
+        return;
       } else {
-        toast('Invalid Admin credentials.', 'error');
+        const errJson = await response.json().catch(() => ({}));
+        toast(errJson.detail || 'Invalid credentials.', 'error');
+        return;
       }
-    } else if (role === 'user') {
-      if (credentials.id === 'user' && credentials.password === 'user123') {
+    } catch (err) {
+      console.warn('Backend auth unreachable, checking local credentials fallback:', err);
+      if (requestedRole === 'admin' && credentials.id === 'admin' && credentials.password === 'admin123') {
+        onLogin('admin');
+      } else if (requestedRole === 'user' && credentials.id === 'user' && credentials.password === 'user123') {
         onLogin('user');
       } else {
-        toast('Invalid User credentials.', 'error');
+        toast('Invalid credentials or backend unavailable.', 'error');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 

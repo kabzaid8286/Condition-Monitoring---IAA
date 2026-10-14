@@ -36,5 +36,41 @@ async def init_db():
             except Exception:
                 # TimescaleDB extension or table already configured
                 pass
+
+        # Auto-seed default users if not present
+        try:
+            from app.models.user import User
+            from app.services.auth_service import get_password_hash
+            from sqlalchemy.future import select
+            
+            async with AsyncSessionLocal() as session:
+                admin_check = await session.execute(
+                    select(User).filter((User.email == "admin") | (User.email == "admin@iaa.de"))
+                )
+                if not admin_check.scalars().first():
+                    admin_user = User(
+                        email="admin@iaa.de",
+                        hashed_password=get_password_hash("admin123"),
+                        full_name="Admin Administrator",
+                        role="admin"
+                    )
+                    session.add(admin_user)
+
+                user_check = await session.execute(
+                    select(User).filter((User.email == "user") | (User.email == "user@iaa.de"))
+                )
+                if not user_check.scalars().first():
+                    std_user = User(
+                        email="user@iaa.de",
+                        hashed_password=get_password_hash("user123"),
+                        full_name="Operator User",
+                        role="viewer"
+                    )
+                    session.add(std_user)
+                    
+                await session.commit()
+                print("✅ Seeded default admin and user credentials into PostgreSQL.")
+        except Exception as seed_err:
+            print(f"User seed notice: {seed_err}")
     except Exception as e:
         print(f"Database connection notice: {e}")

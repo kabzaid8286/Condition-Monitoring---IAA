@@ -35,7 +35,7 @@ export default function DashboardPage({ userRole, onLogout }) {
           {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={setActiveAsset} />}
           {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
           {activeView === 'realtime' && <LiveTelemetryView data={data} />}
-          {activeView === 'historical' && <HistoricalDataView data={data} />}
+          {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} />}
           {activeView === 'ml-models' && <MlModelsView data={data} />}
           {activeView === 'alerts' && <AlertsView />}
           {activeView === 'comparison' && <ComparisonView data={data} />}

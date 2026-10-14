@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 import datetime
+import math
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.services.mqtt_service import hub
 
@@ -41,16 +42,45 @@ async def get_live_asset_telemetry(asset_id: str) -> Dict[str, Any]:
 @router.get("/history")
 async def get_historical_telemetry(
     asset_id: str = Query("test-rig-a", description="Asset identifier"),
-    range: str = Query("7D", description="Time range: 1D, 7D, 30D")
+    time_range: str = Query("7D", alias="range", description="Time range: 1D, 7D, 30D")
 ) -> Dict[str, Any]:
     """Retrieve time-series trend data for historical charts"""
-    # Returns structured time-series history
-    pts = 60 if range == "1D" else 120 if range == "7D" else 200
+    pts = 24 if time_range == "1D" else 42 if time_range == "7D" else 60
     base_vib = 3.4 if asset_id == "test-rig-a" else 2.1 if asset_id == "test-rig-b" else 1.8 if asset_id == "motor-01" else 4.9
-    
+    base_temp = 62.0 if asset_id == "test-rig-a" else 55.0 if asset_id == "test-rig-b" else 70.0 if asset_id == "motor-01" else 75.0
+    base_rpm = 1482.0 if asset_id == "test-rig-a" else 1200.0 if asset_id == "test-rig-b" else 2950.0 if asset_id == "motor-01" else 960.0
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    delta_seconds = 3600 if time_range == "1D" else 14400 if time_range == "7D" else 43200
+
+    labels = []
+    vib_data = []
+    temp_data = []
+    rpm_data = []
+
+    for i in range(pts - 1, -1, -1):
+        t = now - datetime.timedelta(seconds=i * delta_seconds)
+        if time_range == "1D":
+            time_str = t.strftime("%H:%M")
+        else:
+            time_str = t.strftime("%b %d %H:%M")
+        labels.append(time_str)
+
+        cycle = math.sin(i * 0.3)
+        v = round(max(0.2, base_vib + cycle * 0.4 + ((i % 17 == 0) * 1.8)), 2)
+        tp = round(base_temp + math.cos(i * 0.2) * 2.5 + ((i % 19 == 0) * 3.5), 1)
+        rp = round(base_rpm + math.sin(i * 0.15) * 15.0)
+
+        vib_data.append(v)
+        temp_data.append(tp)
+        rpm_data.append(rp)
+
     return {
         "asset_id": asset_id,
-        "range": range,
+        "range": time_range,
         "points": pts,
-        "base_vibration": base_vib
+        "labels": labels,
+        "vibX": vib_data,
+        "temp": temp_data,
+        "rpm": rpm_data
     }

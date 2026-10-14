@@ -38,8 +38,16 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: Optional[timed
 def verify_token(token: str, secret_key: str) -> dict:
     return jwt.decode(token, secret_key, algorithms=[settings.JWT_ALGORITHM])
 
-async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
-    result = await db.execute(select(User).filter(User.email == email))
+async def authenticate_user(db: AsyncSession, identifier: str, password: str) -> Optional[User]:
+    if not identifier or not password:
+        return None
+    ident = identifier.strip().lower()
+    result = await db.execute(
+        select(User).filter(
+            (User.email.ilike(ident)) | 
+            (User.email.ilike(f"{ident}@iaa.de"))
+        )
+    )
     user = result.scalars().first()
     if not user:
         return None

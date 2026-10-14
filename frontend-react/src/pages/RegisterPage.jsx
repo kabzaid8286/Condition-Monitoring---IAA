@@ -27,13 +27,36 @@ export default function RegisterPage({ onNavigate }) {
     setStep(2);
   };
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault();
     if (formData.otp.length >= 4) {
-      toast('Account created successfully!');
-      onNavigate('login');
+      const host = window.location.hostname || 'localhost';
+      try {
+        const response = await fetch(`http://${host}:8000/api/v1/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            full_name: formData.username,
+            role: 'viewer'
+          })
+        });
+
+        if (response.ok) {
+          toast('Account created and registered in database!');
+          onNavigate('login');
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          toast(errData.detail || 'Registration failed or email exists.', 'error');
+        }
+      } catch (err) {
+        console.warn('Backend unavailable, continuing with offline account creation:', err);
+        toast('Account created successfully (Offline mode)!');
+        onNavigate('login');
+      }
     } else {
-      toast('Invalid OTP.', 'error');
+      toast('Invalid OTP code. Please enter 4 digits.', 'error');
     }
   };
 

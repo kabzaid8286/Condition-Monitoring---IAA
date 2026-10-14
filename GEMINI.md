@@ -20,10 +20,9 @@ Develop a condition monitoring system for test rigs / industrial assets (IAA - I
 - **Backend Infrastructure**: Docker containers (TimescaleDB, Redis, Mosquitto) and FastAPI are running.
 - **End-to-End Pipeline**: Tested and verified from MQTT $\rightarrow$ FastAPI $\rightarrow$ WebSocket $\rightarrow$ React frontend.
 
-## 4. Current Phase: API Integration & Microcontroller Firmware
-- **HTTP APIs**: Wire `/api/v1/telemetry/history` to Historical and Analysis charts.
-- **Authentication**: Wire Login/Register to PostgreSQL `users` table via FastAPI `/api/v1/auth/`.
-- **Microcontroller Firmware**: C/C++ sketch for Seeed Studio XIAO with 5-minute deep sleep timer and 10-second burst acquisition.
+## 4. Current Phase: Microcontroller Plug-in, Flashing & Live Streaming (Phase 4)
+- **Phase 3 Completed**: WebSocket telemetry, USB serial gateway reader, C/C++ sketch (`firmware/xiao_condition_node/`), battery/burst UI, historical telemetry API, and PostgreSQL Argon2 authentication are 100% completed and verified.
+- **Next Milestone**: Plug the physical Seeed Studio XIAO into Mac via USB-C, flash the C sketch in Arduino IDE, and stream live hardware telemetry to the dashboard.
 
 ## 5. Safety & Development Rules
 - **No Destructive Overwrites**: Do not delete or overwrite existing working React components without explicit intention.

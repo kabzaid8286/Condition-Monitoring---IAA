@@ -1,16 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { commonOptions } from '../components/charts/ChartConfig';
 import { ANOMALY_EVENTS } from '../data/mockData';
 
-export default function HistoricalDataView({ data }) {
+export default function HistoricalDataView({ data, activeAsset = 'test-rig-a' }) {
   const [timeRange, setTimeRange] = useState('7D');
+  const [histData, setHistData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setIsLoading(true);
+
+    const host = window.location.hostname || 'localhost';
+    fetch(`http://${host}:8000/api/v1/telemetry/history?asset_id=${activeAsset}&range=${timeRange}`)
+      .then(res => res.json())
+      .then(json => {
+        if (!isCancelled && json && json.labels) {
+          setHistData(json);
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch historical telemetry, falling back to local buffer:', err);
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoading(false);
+      });
+
+    return () => { isCancelled = true; };
+  }, [activeAsset, timeRange]);
+
+  const labels = histData ? histData.labels : data.labels;
+  const vibValues = histData ? histData.vibX : data.vibX.map(v => (v * 1.5).toFixed(2));
+  const tempValues = histData ? histData.temp : data.temp.map(v => (v * 1.1).toFixed(2));
+  const rpmValues = histData ? histData.rpm : data.rpm.map(v => (v * 0.95).toFixed(0));
 
   const histVibData = {
-    labels: data.labels,
+    labels: labels,
     datasets: [{
-      label: 'Vibration RMS',
-      data: data.vibX.map(v => (v * 1.5).toFixed(2)),
+      label: 'Vibration RMS (mm/s)',
+      data: vibValues,
       borderColor: '#3b82f6',
       backgroundColor: 'rgba(59, 130, 246, 0.1)',
       borderWidth: 2,
@@ -21,10 +50,10 @@ export default function HistoricalDataView({ data }) {
   };
 
   const histTempData = {
-    labels: data.labels,
+    labels: labels,
     datasets: [{
-      label: 'Temperature',
-      data: data.temp.map(v => (v * 1.1).toFixed(2)),
+      label: 'Temperature (°C)',
+      data: tempValues,
       borderColor: '#10b981',
       backgroundColor: 'rgba(16, 185, 129, 0.1)',
       borderWidth: 2,
@@ -35,10 +64,10 @@ export default function HistoricalDataView({ data }) {
   };
 
   const histRpmData = {
-    labels: data.labels,
+    labels: labels,
     datasets: [{
       label: 'RPM',
-      data: data.rpm.map(v => (v * 0.95).toFixed(0)),
+      data: rpmValues,
       borderColor: '#f59e0b',
       backgroundColor: 'rgba(245, 158, 11, 0.1)',
       borderWidth: 2,
@@ -63,7 +92,10 @@ export default function HistoricalDataView({ data }) {
 
       <div className="card" style={{ marginTop: "20px" }}>
         <div className="card-header">
-          <div className="card-title">Vibration RMS — 7-Day History</div>
+          <div className="card-title">
+            Vibration RMS — {timeRange} History
+            {isLoading && <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '10px' }}>Loading...</span>}
+          </div>
           <div className="time-range-btns">
             {['1D', '7D', '30D'].map(range => (
               <button
