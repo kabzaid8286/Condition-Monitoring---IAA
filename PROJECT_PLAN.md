@@ -1,41 +1,59 @@
-# Project Plan & Roadmap
+# Condition Monitoring App (IAA) — Master Project Plan & Roadmap
 
 ## Phase 1: Frontend Development (Completed)
-- [x] Build Vanilla JS Prototype (`frontend/index.html`)
-- [x] Set up React SPA structure (`frontend-react/`)
-- [x] Migrate all views (Overview, Live Telemetry, Historical, ML Models, AI Assistant, Alerts, Comparison)
-- [x] Establish Design System (Vanilla CSS, Glassmorphism)
+- [x] Build initial UI prototype and evaluate dashboard layout.
+- [x] Set up React SPA structure (`frontend-react/`) with Vite and React 19.
+- [x] Implement all operational views:
+  - Overview (KPI sparklines, main trend chart, active alerts, sensor status table).
+  - Real-Time Monitoring (Dial gauges, 1 Hz multi-channel feed, FFT frequency spectrum).
+  - Historical Trends (1D, 7D, 30D rolling telemetry from FastAPI).
+  - ML Models & Predictions (Live anomaly score, RUL prognosis, fault matrix).
+  - Alerts & Incidents (Severity filtering and alert acknowledgment).
+  - Asset Comparison & Extended Statistical Analysis (Mean, min, max, std dev).
+  - Test Design (Custom component configuration and system load profiling).
+  - Authentication (Login, Register, Forgot Password with persistent session).
+- [x] Establish custom Vanilla CSS design system (Dark mode, glassmorphism, responsive).
 
-## Phase 2: Backend & Infrastructure Setup (Completed)
-- [x] Deploy Mosquitto MQTT Broker (Docker)
-- [x] Deploy TimescaleDB & Redis (Docker)
-- [x] Initialize FastAPI Backend (`backend/app/main.py`)
-- [x] Create Python publisher script for Raspberry Pi 5 (`gateway/rpi_publisher.py`)
-- [x] Implement WebSocket `TelemetryHub` in FastAPI for real-time streaming
+## Phase 2: Backend Infrastructure & API (Completed)
+- [x] Deploy Mosquitto MQTT Broker (port 1883) via Docker.
+- [x] Deploy TimescaleDB / PostgreSQL (port 5432) and Redis (port 6379) via Docker.
+- [x] Build FastAPI Backend (`backend/app/main.py`) with telemetry and equipment routers.
+- [x] Implement WebSocket `TelemetryHub` in FastAPI for real-time bi-directional streaming.
+- [x] Implement PostgreSQL database models with Argon2 password hashing for admin/user roles.
 
-## Phase 3: Hardware Ingestion Pipeline & System Readiness (Completed)
-*Goal: Complete all backend, gateway, firmware sketch, and dashboard wiring so the platform is 100% ready the moment the microcontroller is plugged in.*
-- [x] Connect React `useSensorData` hook to FastAPI WebSockets.
-- [x] Implement robust reconnection logic for WebSockets in React (auto-fallback to local simulation when disconnected).
-- [x] Verify End-to-End flow with `rpi_publisher.py` publishing over MQTT to FastAPI WebSocket broadcast.
-- [x] **Gateway USB Serial Ingestion**: Upgraded `gateway/rpi_publisher.py` with plug-and-play USB Serial reader (`pyserial`) supporting macOS (`/dev/cu.usbmodem*`) and Linux (`/dev/ttyACM*`) to read incoming Seeed Studio XIAO data and publish to MQTT.
-- [x] **C/C++ Firmware Sketch**: Created the ready-to-flash Arduino sketch (`firmware/xiao_condition_node/xiao_condition_node.ino`) with 5-minute deep sleep timer and 10-second burst acquisition (vibration, temp, battery level).
-- [x] **Burst Telemetry & Battery UI**: Added battery percentage badge (`🔋 98%`) and low-power deep sleep status (`💤 Deep Sleep`) to the React header and dashboard.
-- [x] **Historical Telemetry API**: Connected `HistoricalDataView.jsx` to FastAPI `/api/v1/telemetry/history` for dynamic 1D, 7D, 30D time-series visualization.
-- [x] **Authentication**: Wired `LoginPage.jsx` & `RegisterPage.jsx` to FastAPI `/api/v1/auth/` backed by the PostgreSQL `users` table with Argon2 password hashing.
+## Phase 3: Hardware Ingestion & Direct USB Streaming (Completed)
+- [x] **C/C++ Firmware Sketch**: Authored `firmware/xiao_condition_node/xiao_condition_node.ino` with 5-minute deep sleep timer and 10-second burst acquisition (vibration, temp, battery level).
+- [x] **Flashing & Verification**: Compiled and flashed sketch to Seeed Studio XIAO microcontroller. The program is stored in non-volatile flash memory and runs immediately upon USB connection without re-flashing.
+- [x] **Gateway USB Serial Ingestion**: Created `gateway/rpi_publisher.py` with auto-reconnecting serial reader (`pyserial`) supporting macOS (`/dev/cu.usbmodem*`) and Linux (`/dev/ttyACM*`).
+- [x] **End-to-End Live Verification**: Verified live streaming from Seeed Studio XIAO $\rightarrow$ USB Serial $\rightarrow$ `rpi_publisher.py` $\rightarrow$ Mosquitto MQTT $\rightarrow$ FastAPI WebSocket $\rightarrow$ React SPA dashboard.
 
-## Phase 4: Microcontroller Plug-in, Flashing & Live Rig Streaming (Next Milestone)
-*Goal: Connect the physical Seeed Studio XIAO board to Mac, flash the C code, and stream real sensor data.*
-- [ ] Plug Seeed Studio XIAO board into Mac via USB-C cable.
-- [ ] Compile and flash `firmware/xiao_condition_node/xiao_condition_node.ino` using Arduino IDE.
-- [ ] Run `python gateway/rpi_publisher.py --serial` on Mac to ingest real sensor telemetry over USB and verify live dashboard streaming.
+## Phase 4: Telemetry Stabilization & Custom Asset Persistence (Completed)
+- [x] **Glitch Resolution**: Pre-seeded rolling buffers with 20 baseline points to eliminate blank sparklines and chart dropouts.
+- [x] **Hardware Heartbeat Watchdog**: Dashboard dynamically displays `Live WS (RPi 5)` when live packets stream and `Hardware Offline` when the microcontroller is unplugged.
+- [x] **Custom Asset Persistence**: Custom test designs created in `Test Design` persist in `localStorage` across reloads and execute virtual telemetry simulations with their configured baseline parameters.
+- [x] **Code Cleanliness**: Pruned all mock machine profiles down to the single active test rig (`test-rig-a`).
 
-## Phase 5: Machine Learning & Analytics (Upcoming)
-- [ ] Set up Celery background workers.
-- [ ] Integrate actual ML models (LSTM, Random Forest) for anomaly detection on incoming MQTT data.
-- [ ] Plumb ML anomaly scores through WebSockets to the React frontend.
+---
 
-## Phase 6: Physical Deployment to Raspberry Pi 5 & Cloud Hosting (Upcoming)
-- [ ] Move `rpi_publisher.py` to physical Raspberry Pi 5 on the test rig.
-- [ ] Deploy Frontend (React/Vite) for FREE on Vercel or Cloudflare Pages.
-- [ ] Deploy Backend (FastAPI, PostgreSQL, MQTT) on cheap/free tier cloud infrastructure.
+## Phase 5: Physical Raspberry Pi 5 Gateway Deployment (Next Milestone)
+*Goal: Move gateway from development Mac to the physical Raspberry Pi 5 mounted on the test rig.*
+- [ ] Transfer `gateway/rpi_publisher.py` and its dependencies to the Raspberry Pi 5 OS (Debian Bookworm).
+- [ ] Connect the Seeed Studio XIAO sensor node to the Raspberry Pi 5 via USB-C.
+- [ ] Configure `rpi_publisher.py` as a `systemd` daemon (`condition-monitor-gateway.service`) for auto-start on boot.
+- [ ] Configure network routing so the Raspberry Pi 5 publishes MQTT telemetry over Wi-Fi/Ethernet to the backend server.
+- [ ] Test wireless/remote streaming from Raspberry Pi 5 to the centralized dashboard.
+
+## Phase 6: Machine Learning Pipeline & Background Processing
+*Goal: Transition from baseline anomaly rules to automated ML inference on live telemetry batches.*
+- [ ] Configure Celery background workers connected to Redis task broker.
+- [ ] Implement inference worker for LSTM Autoencoder (unsupervised reconstruction error anomaly detection).
+- [ ] Implement XGBoost classifier for multi-fault identification (Bearing Defect, Misalignment, Imbalance, Looseness).
+- [ ] Compute Remaining Useful Life (RUL) estimation curve based on degradation trajectory.
+- [ ] Stream ML predictions and trigger automated alerts in TimescaleDB and the React UI.
+
+## Phase 7: Production Cloud / On-Premises Deployment
+*Goal: Package and deploy the application for multi-user access across HS Aalen.*
+- [ ] Dockerize the React SPA (Nginx multi-stage build) or deploy to Vercel/Cloudflare Pages edge.
+- [ ] Containerize full backend stack with production Docker Compose (FastAPI, Mosquitto, TimescaleDB, Redis, Celery).
+- [ ] Configure reverse proxy (Nginx or Caddy) with TLS/SSL encryption for HTTPS and WSS.
+- [ ] Handover documentation, user manual, and operational guides for researchers and operators.
