@@ -27,9 +27,22 @@
 #define SLEEP_DURATION_SEC  290ULL       // 4 min 50 sec sleep (~5 min cycle)
 #define SAMPLE_INTERVAL_MS  1000UL       // 1 Hz sample rate during burst (or 100ms for 10Hz)
 
-// Pin definitions (Adjust to your custom carrier board routing)
-#define PIN_TEMP_PROBE      A0           // Analog Temp Probe or ADC
-#define PIN_BATTERY_SENSE   A1           // Battery voltage divider
+// Pin definitions (Cross-compatible across all Seeed Studio XIAO boards: ESP32-C3, ESP32-S3, RP2040, SAMD21)
+#if defined(A0)
+  #define PIN_TEMP_PROBE      A0           // Analog Temp Probe or ADC
+#elif defined(D0)
+  #define PIN_TEMP_PROBE      D0
+#else
+  #define PIN_TEMP_PROBE      2           // Default GPIO 2 on XIAO ESP32-C3
+#endif
+
+#if defined(A1)
+  #define PIN_BATTERY_SENSE   A1           // Battery voltage divider
+#elif defined(D1)
+  #define PIN_BATTERY_SENSE   D1
+#else
+  #define PIN_BATTERY_SENSE   3           // Default GPIO 3 on XIAO ESP32-C3
+#endif
 
 // ==========================================
 // SENSOR READING HELPERS
