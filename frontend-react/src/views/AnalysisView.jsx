@@ -73,7 +73,7 @@ export default function AnalysisView({ data, activeAsset }) {
   return (
     <>
       <div>
-        <div className="page-title">📈 Extended Analysis</div>
+        <div className="page-title">Extended Analysis</div>
         <div className="page-title-sub">Deep-dive statistical analysis and multi-axis visualization for {asset.name}</div>
       </div>
 

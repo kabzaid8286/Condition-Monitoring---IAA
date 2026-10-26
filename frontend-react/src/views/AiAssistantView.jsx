@@ -95,7 +95,7 @@ export default function AiAssistantView({ activeAsset = 'test-rig-a' }) {
   const [messages, setMessages] = useState([
     {
       role: 'ai',
-      text: `👋 Hello! I'm the **IAA Diagnostic AI Assistant**.\n\nI have read-only access to live sensor data from **${assetName}** and can help you:\n• Explain anomalies and alerts\n• Estimate remaining useful life\n• Recommend maintenance actions\n• Compare multiple assets\n\nAll insights are cited from sensor readings and ML model outputs. How can I help?`,
+      text: `Hello! I'm the **IAA Diagnostic AI Assistant**.\n\nI have read-only access to live sensor data from **${assetName}** and can help you:\n• Explain anomalies and alerts\n• Estimate remaining useful life\n• Recommend maintenance actions\n• Compare multiple assets\n\nAll insights are cited from sensor readings and ML model outputs. How can I help?`,
       time: now()
     }
   ]);
@@ -115,7 +115,7 @@ export default function AiAssistantView({ activeAsset = 'test-rig-a' }) {
     if (ql.includes('maint') || ql.includes('recommend') || ql.includes('action') || ql.includes('fix')) return AI_ANSWERS.maintenance;
     if (ql.includes('compar') || ql.includes('motor') || ql.includes('rig')) return AI_ANSWERS.compare;
 
-    return `I reviewed live telemetry from **${assetName}**.\n\nCurrent status:\n• Vibration RMS: **3.42 mm/s** (nominal)\n• Bearing Temperature: **62.1 °C**\n• Shaft Speed: **1,482 RPM**\n• Anomaly Score: **0.23** (Low risk)\n\nTry asking about: **health status, anomalies, remaining useful life, or maintenance recommendations**. 🤖`;
+    return `I reviewed live telemetry from **${assetName}**.\n\nCurrent status:\n• Vibration RMS: **3.42 mm/s** (nominal)\n• Bearing Temperature: **62.1 °C**\n• Shaft Speed: **1,482 RPM**\n• Anomaly Score: **0.23** (Low risk)\n\nTry asking about: **health status, anomalies, remaining useful life, or maintenance recommendations**.`;
   };
 
   const handleSend = (textToSend) => {
@@ -135,17 +135,17 @@ export default function AiAssistantView({ activeAsset = 'test-rig-a' }) {
   };
 
   const quickPrompts = [
-    { label: '🏥 Health status', prompt: 'What is the current health status of the asset?' },
-    { label: '〰️ Explain anomaly', prompt: 'Explain the latest vibration anomaly detected.' },
-    { label: '⏳ RUL estimate', prompt: 'How much remaining useful life does the bearing have?' },
-    { label: '🔧 Recommendations', prompt: 'What maintenance actions do you recommend?' },
-    { label: '⚖️ Compare assets', prompt: 'Compare vibration trends between Test Rig A and Motor 01.' }
+    { label: 'Health status', prompt: 'What is the current health status of the asset?' },
+    { label: 'Explain anomaly', prompt: 'Explain the latest vibration anomaly detected.' },
+    { label: 'RUL estimate', prompt: 'How much remaining useful life does the bearing have?' },
+    { label: 'Recommendations', prompt: 'What maintenance actions do you recommend?' },
+    { label: 'Compare assets', prompt: 'Compare vibration trends between Test Rig A and Motor 01.' }
   ];
 
   return (
     <>
       <div>
-        <div className="page-title">💬 AI Diagnostic Assistant</div>
+        <div className="page-title">AI Diagnostic Assistant</div>
         <div className="page-title-sub">Ask questions about machine health, alerts, and sensor readings</div>
       </div>
 

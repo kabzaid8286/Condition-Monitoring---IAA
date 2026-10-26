@@ -61,7 +61,7 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
   return (
     <>
       <div>
-        <div className="page-title">⚙️ Test Design</div>
+        <div className="page-title">Test Design</div>
         <div className="page-title-sub">Configure and customize testing scenarios (Admin Only)</div>
       </div>
 

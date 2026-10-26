@@ -214,7 +214,7 @@ export default function LiveTelemetryView({ data }) {
   return (
     <>
       <div>
-        <div className="page-title">📡 Real-Time Monitoring</div>
+        <div className="page-title">Real-Time Monitoring</div>
         <div className="page-title-sub">Live sensor gauges updating every second</div>
       </div>
       

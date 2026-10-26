@@ -95,7 +95,7 @@ export default function MlModelsView() {
   return (
     <>
       <div>
-        <div className="page-title">🤖 ML Predictions</div>
+        <div className="page-title">ML Predictions</div>
         <div className="page-title-sub">Anomaly detection and remaining useful life estimation</div>
       </div>
 
@@ -190,8 +190,9 @@ export default function MlModelsView() {
 
         <div className="fault-tags" id="fault-tags">
           {m.faults.map((f, i) => (
-            <div key={i} className={`fault-tag ${f.state}`}>
-              {f.state === 'active' ? '🔴' : f.state === 'warn' ? '⚠️' : '✅'} {f.label}
+            <div key={i} className={`fault-tag ${f.state}`} style={{display:'inline-flex', alignItems:'center'}}>
+              <span className={`status-dot ${f.state === 'active' ? 'alarm' : f.state === 'warn' ? 'warn' : 'ok'}`} style={{width:'7px', height:'7px', marginRight:'6px', display:'inline-block'}}></span>
+              {f.label}
             </div>
           ))}
         </div>

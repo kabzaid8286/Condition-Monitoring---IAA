@@ -80,7 +80,7 @@ export default function ComparisonView() {
   return (
     <>
       <div>
-        <div className="page-title">⚖️ Asset Comparison</div>
+        <div className="page-title">Asset Comparison</div>
         <div className="page-title-sub">Side-by-side live metrics for multiple machines</div>
       </div>
 
@@ -100,7 +100,7 @@ export default function ComparisonView() {
           return (
             <div key={key} className="card comparison-card">
               <div className="comparison-asset-name">
-                🏭 {a.name}
+                {a.name}
                 <span
                   className="badge"
                   style={{

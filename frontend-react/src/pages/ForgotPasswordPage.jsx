@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Mail } from 'lucide-react';
 import { toast } from '../utils/toast';
 
 export default function ForgotPasswordPage({ onNavigate }) {
@@ -47,7 +48,9 @@ export default function ForgotPasswordPage({ onNavigate }) {
           </form>
         ) : (
           <div style={{ textAlign: 'center', marginTop: '20px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '10px' }}>✉️</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+              <Mail size={44} color="var(--accent)" />
+            </div>
             <div className="login-title" style={{ fontSize: '18px' }}>Check your Email</div>
             <div className="login-subtitle">If {email} exists in our system, you will receive a password reset link shortly.</div>
           </div>

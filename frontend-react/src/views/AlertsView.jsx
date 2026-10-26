@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { ALERT_DATA } from '../data/mockData';
 
 export default function AlertsView() {
@@ -6,9 +7,9 @@ export default function AlertsView() {
   const [filter, setFilter] = useState('all');
 
   const icons = {
-    critical: '🚨',
-    warning: '⚠️',
-    info: 'ℹ️'
+    critical: <AlertCircle size={16} color="#f43f5e" />,
+    warning: <AlertTriangle size={16} color="#f59e0b" />,
+    info: <Info size={16} color="#3b82f6" />
   };
 
   const handleAck = (id) => {
@@ -42,7 +43,7 @@ export default function AlertsView() {
     <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div className="page-title">🚨 Alerts &amp; Alarms</div>
+          <div className="page-title">Alerts &amp; Alarms</div>
           <div className="page-title-sub">Active anomaly detections requiring attention</div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -64,7 +65,7 @@ export default function AlertsView() {
               fontFamily: 'inherit'
             }}
           >
-            ✓ Acknowledge All
+            Acknowledge All
           </button>
         </div>
       </div>
@@ -90,9 +91,11 @@ export default function AlertsView() {
                 className={`alert-item ${a.acked ? 'acked' : a.sev}`}
                 id={`alert-${a.id}`}
               >
-                <div className="alert-sev-icon">{icons[a.sev] || 'ℹ️'}</div>
+                <div className="alert-sev-icon" style={{display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  {icons[a.sev] || <Info size={16} color="#3b82f6" />}
+                </div>
                 <div className="alert-body">
-                  <div className="alert-title">{a.acked ? '✓ ' : ''}{a.title}</div>
+                  <div className="alert-title">{a.title}</div>
                   <div className="alert-desc">{a.desc}</div>
                   <div className="alert-meta">Asset: {a.asset} · {a.time}</div>
                 </div>
@@ -105,7 +108,7 @@ export default function AlertsView() {
                   </button>
                 ) : (
                   <span style={{ fontSize: '11px', color: 'var(--green)', whiteSpace: 'nowrap' }}>
-                    ✓ Acked
+                    Acknowledged
                   </span>
                 )}
               </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Line } from 'react-chartjs-2';
+import { Activity, Thermometer, Zap, TrendingUp } from 'lucide-react';
 import KpiCard from '../components/dashboard/KpiCard';
 import { commonOptions } from '../components/charts/ChartConfig';
 import { ALERT_DATA } from '../data/mockData';
@@ -43,14 +44,14 @@ export default function OverviewView({ kpis, data }) {
 
   return (
     <>
-      <div className="page-title">🏠 Overview <span className="badge blue" style={{fontSize:"11px", fontWeight:500}}>Live</span></div>
+      <div className="page-title">Overview <span className="badge blue" style={{fontSize:"11px", fontWeight:500}}>Live</span></div>
       <div className="page-title-sub">Main system status and health</div>
       
       <div className="overview-grid" style={{marginTop:"20px"}}>
-         <KpiCard title="Vibration RMS" value={kpis.vibRms} unit="mm/s" colorClass="blue" icon="〰️" chartData={getSparklineData(data.vibX, '#3b82f6')} trend="↑ +0.18 from last hour" trendClass="up" />
-         <KpiCard title="Bearing Temp" value={kpis.temp} unit="°C" colorClass="green" icon="🌡️" chartData={getSparklineData(data.temp, '#10b981')} trend="→ Stable for 14 min" trendClass="neutral" />
-         <KpiCard title="Shaft Speed" value={kpis.rpm} unit="RPM" colorClass="amber" icon="⚡" chartData={getSparklineData(data.rpm, '#f59e0b')} trend="→ Within setpoint ±5" trendClass="neutral" />
-         <KpiCard title="Anomaly Score" value={(kpis.vibRms / 10).toFixed(2)} unit="/1.0" colorClass="rose" icon="📊" chartData={getSparklineData(data.vibX.map(v => v/10), '#f43f5e')} trend="↓ Low risk" trendClass="down" />
+         <KpiCard title="Vibration RMS" value={kpis.vibRms} unit="mm/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(data.vibX, '#3b82f6')} trend="↑ +0.18 from last hour" trendClass="up" />
+         <KpiCard title="Bearing Temp" value={kpis.temp} unit="°C" colorClass="green" icon={<Thermometer size={18} color="#10b981" />} chartData={getSparklineData(data.temp, '#10b981')} trend="→ Stable for 14 min" trendClass="neutral" />
+         <KpiCard title="Shaft Speed" value={kpis.rpm} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(data.rpm, '#f59e0b')} trend="→ Within setpoint ±5" trendClass="neutral" />
+         <KpiCard title="Anomaly Score" value={(kpis.vibRms / 10).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(data.vibX.map(v => v/10), '#f43f5e')} trend="↓ Low risk" trendClass="down" />
       </div>
 
       <div className="chart-row" style={{marginTop: "16px"}}>
@@ -75,7 +76,9 @@ export default function OverviewView({ kpis, data }) {
           <div className="alert-list">
             {activeAlerts.map(a => (
               <div key={a.id} className={`alert-item ${a.sev}`}>
-                <div className="alert-sev-icon">{a.sev === 'critical' ? '🔴' : a.sev === 'warning' ? '🟡' : '🔵'}</div>
+                <div className="alert-sev-icon" style={{display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <span className={`status-dot ${a.sev === 'critical' ? 'alarm' : a.sev === 'warning' ? 'warn' : 'ok'}`} style={{width:'8px', height:'8px'}}></span>
+                </div>
                 <div className="alert-body">
                   <div className="alert-title">{a.title}</div>
                   <div className="alert-desc">{a.desc}</div>

@@ -127,10 +127,10 @@ export default function LoginPage({ onLogin, onNavigate }) {
           />
         </div>
         <button className="login-btn" onClick={(e) => { e.preventDefault(); attemptLogin('user'); }} style={{marginTop:"10px", background:"linear-gradient(135deg, var(--blue), var(--purple))"}}>
-          <span className="role-icon">👤</span> Login as User
+          Login as User
         </button>
         <button className="login-btn" onClick={(e) => { e.preventDefault(); attemptLogin('admin'); }} style={{marginTop:"12px", background:"linear-gradient(135deg, var(--rose), var(--orange))"}}>
-          <span className="role-icon">🛡️</span> Login as Admin
+          Login as Admin
         </button>
 
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center', fontSize: '13px' }}>

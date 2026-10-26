@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { AlertTriangle, Battery } from 'lucide-react';
 import { exportCSV, exportJSON, exportPDF } from '../../utils/exportReport';
 import { useAssets } from '../../contexts/AssetContext';
 
@@ -34,7 +35,7 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data, kp
     <>
       <div className={`alarm-banner ${manualAlarm ? 'active' : ''}`} id="global-alarm-banner">
         <div style={{display:'flex', alignItems:'center', gap:'15px', maxWidth:'1400px', margin:'0 auto', padding:'0 20px'}}>
-          <span style={{fontSize:'24px', animation:'pulse-dot 1s infinite'}}>⚠️</span>
+          <AlertTriangle size={24} color="#f43f5e" style={{animation:'pulse-dot 1s infinite'}} />
           <div style={{flex:1}}>
             <div style={{fontWeight:700, fontSize:'16px'}}>CRITICAL SYSTEM ALARM</div>
             <div style={{fontSize:'13px', opacity:0.9}}>Multiple anomalous vibration signatures detected. Immediate inspection required.</div>
@@ -73,13 +74,13 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data, kp
           </div>
         )}
         {kpis && kpis.battery !== undefined && (
-          <div className="status-pill" title={`Sensor Node Battery: ${kpis.battery}%`} style={{background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)", fontSize: "11px", padding: "4px 10px", border: "1px solid var(--border)"}}>
-            🔋 {kpis.battery}%
+          <div className="status-pill" title={`Sensor Node Battery: ${kpis.battery}%`} style={{background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)", fontSize: "11px", padding: "4px 10px", border: "1px solid var(--border)", display: "inline-flex", alignItems: "center", gap: "5px"}}>
+            <Battery size={13} style={{verticalAlign: "-1px"}} /> {kpis.battery}%
           </div>
         )}
         {kpis && kpis.burstState === 'sleep' && (
           <div className="status-pill" title="Microcontroller in Deep Sleep (Power Saving)" style={{background: "rgba(99,102,241,0.15)", color: "#818cf8", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(99,102,241,0.3)"}}>
-            💤 Deep Sleep
+            Deep Sleep
           </div>
         )}
       </div>
@@ -92,9 +93,9 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data, kp
           <div className="icon-btn" title="Export Report" onClick={() => setDropdownOpen(!dropdownOpen)}>📥</div>
           {dropdownOpen && (
             <div className="dropdown-menu" style={{display: "block", position: "absolute", top: "40px", right: 0, background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "8px", width: "220px", zIndex: 1000, boxShadow: "0 10px 25px rgba(0,0,0,0.5)"}}>
-              <div className="dropdown-item" onClick={() => handleExport('pdf')} style={{padding: "10px", cursor: "pointer", borderRadius: "6px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>📄 Executive PDF</div>
-              <div className="dropdown-item" onClick={() => handleExport('csv')} style={{padding: "10px", cursor: "pointer", borderRadius: "6px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>📊 Raw Telemetry (CSV)</div>
-              <div className="dropdown-item" onClick={() => handleExport('json')} style={{padding: "10px", cursor: "pointer", borderRadius: "6px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>⚙️ ML Payload (JSON)</div>
+              <div className="dropdown-item" onClick={() => handleExport('pdf')} style={{padding: "10px", cursor: "pointer", borderRadius: "6px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>Executive PDF</div>
+              <div className="dropdown-item" onClick={() => handleExport('csv')} style={{padding: "10px", cursor: "pointer", borderRadius: "6px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>Raw Telemetry (CSV)</div>
+              <div className="dropdown-item" onClick={() => handleExport('json')} style={{padding: "10px", cursor: "pointer", borderRadius: "6px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>ML Payload (JSON)</div>
             </div>
           )}
         </div>

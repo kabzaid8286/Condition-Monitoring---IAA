@@ -86,7 +86,7 @@ export default function HistoricalDataView({ data, activeAsset = 'test-rig-a' })
   return (
     <>
       <div>
-        <div className="page-title">📈 Historical Trends</div>
+        <div className="page-title">Historical Trends</div>
         <div className="page-title-sub">Long-range time series analysis and anomaly timeline</div>
       </div>
 
