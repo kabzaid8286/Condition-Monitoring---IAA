@@ -36,21 +36,29 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
 
   const handleSave = (e) => {
     e.preventDefault();
-    const id = formData.machineName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const rawName = (formData.machineName || '').trim() || 'Custom Rig X';
+    const id = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `custom-${Date.now()}`;
+    const baseVib = parseFloat(formData.baseVib) || 2.5;
+    const baseTemp = parseFloat(formData.baseTemp) || 45.0;
+
     addAsset(id, {
-      name: formData.machineName,
+      name: rawName,
       label: 'Custom Configuration',
-      basevib: parseFloat(formData.baseVib),
-      basetemp: parseFloat(formData.baseTemp),
+      basevib: baseVib,
+      basetemp: baseTemp,
       baserpm: 1500
     });
-    toast(`Configuration saved for ${formData.machineName}! It is now available in the system.`);
+
+    if (setActiveAsset) {
+      setActiveAsset(id);
+    }
+    toast(`Configuration saved for ${rawName}! Telemetry simulation is now live.`);
   };
 
   const handleDelete = (id) => {
     const assetToDelete = assets[id];
     removeAsset(id);
-    if (activeAsset === id) {
+    if (activeAsset === id && setActiveAsset) {
       setActiveAsset('test-rig-a');
     }
     toast(`${assetToDelete ? assetToDelete.name : 'Machine'} deleted successfully.`, 'error');
@@ -137,17 +145,34 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
                 <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Manage Custom Machines</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '600px' }}>
                   {customAssets.map(([id, a]) => (
-                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-glass)', border: activeAsset === id ? '1px solid var(--accent)' : '1px solid var(--border)', borderRadius: '6px' }}>
                       <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.name}</span>
+                          {activeAsset === id && (
+                            <span style={{ fontSize: '11px', background: 'rgba(99,102,241,0.2)', color: '#818cf8', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>Active</span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Base Vib: {a.basevib} mm/s | Base Temp: {a.basetemp} °C</div>
                       </div>
-                      <button 
-                        onClick={() => handleDelete(id)}
-                        style={{ background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
-                      >
-                        Delete
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {activeAsset !== id && (
+                          <button 
+                            type="button"
+                            onClick={() => setActiveAsset && setActiveAsset(id)}
+                            style={{ background: 'var(--accent)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                          >
+                            Activate
+                          </button>
+                        )}
+                        <button 
+                          type="button"
+                          onClick={() => handleDelete(id)}
+                          style={{ background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

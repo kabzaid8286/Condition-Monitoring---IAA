@@ -13,8 +13,31 @@ import AnalysisView from '../views/AnalysisView';
 import useSensorData from '../hooks/useSensorData';
 
 export default function DashboardPage({ userRole, onLogout }) {
-  const [activeView, setActiveView] = useState('overview');
-  const [activeAsset, setActiveAsset] = useState('test-rig-a');
+  const [activeView, setActiveView] = useState(() => {
+    return localStorage.getItem('condition_monitoring_active_view') || 'overview';
+  });
+  const [activeAsset, setActiveAsset] = useState(() => {
+    return localStorage.getItem('condition_monitoring_active_asset') || 'test-rig-a';
+  });
+
+  const handleSelectView = (newView) => {
+    setActiveView(newView);
+    try {
+      localStorage.setItem('condition_monitoring_active_view', newView);
+    } catch (e) {
+      console.warn('Error saving active view to localStorage:', e);
+    }
+  };
+
+  const handleSelectAsset = (newAsset) => {
+    setActiveAsset(newAsset);
+    try {
+      localStorage.setItem('condition_monitoring_active_asset', newAsset);
+    } catch (e) {
+      console.warn('Error saving active asset to localStorage:', e);
+    }
+  };
+
   const { data, kpis, isConnected, connectionMode } = useSensorData(activeAsset);
 
   return (
@@ -22,17 +45,17 @@ export default function DashboardPage({ userRole, onLogout }) {
       <Header 
         userRole={userRole} 
         activeAsset={activeAsset} 
-        setActiveAsset={setActiveAsset} 
+        setActiveAsset={handleSelectAsset} 
         data={data} 
         kpis={kpis}
         isConnected={isConnected}
         connectionMode={connectionMode}
       />
       <div className="app-body">
-        <Sidebar userRole={userRole} activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />
+        <Sidebar userRole={userRole} activeView={activeView} setActiveView={handleSelectView} onLogout={onLogout} />
         
         <main className="main-content">
-          {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={setActiveAsset} />}
+          {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={handleSelectAsset} />}
           {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
           {activeView === 'realtime' && <LiveTelemetryView data={data} />}
           {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} />}

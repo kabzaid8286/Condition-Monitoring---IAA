@@ -51,7 +51,7 @@ export default function OverviewView({ kpis, data }) {
          <KpiCard title="Vibration RMS" value={kpis.vibRms} unit="mm/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(data.vibX, '#3b82f6')} trend="↑ +0.18 from last hour" trendClass="up" />
          <KpiCard title="Bearing Temp" value={kpis.temp} unit="°C" colorClass="green" icon={<Thermometer size={18} color="#10b981" />} chartData={getSparklineData(data.temp, '#10b981')} trend="→ Stable for 14 min" trendClass="neutral" />
          <KpiCard title="Shaft Speed" value={kpis.rpm} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(data.rpm, '#f59e0b')} trend="→ Within setpoint ±5" trendClass="neutral" />
-         <KpiCard title="Anomaly Score" value={(kpis.vibRms / 10).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(data.vibX.map(v => v/10), '#f43f5e')} trend="↓ Low risk" trendClass="down" />
+         <KpiCard title="Anomaly Score" value={(parseFloat(kpis.vibRms || 0) / 10).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(data.vibX.map(v => parseFloat(v || 0)/10), '#f43f5e')} trend="↓ Low risk" trendClass="down" />
       </div>
 
       <div className="chart-row" style={{marginTop: "16px"}}>

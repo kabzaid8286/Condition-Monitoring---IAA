@@ -11,7 +11,10 @@ export default function AnalysisView({ data, activeAsset }) {
     if (!data || !data.vibX) return null;
 
     const calcStats = (arr) => {
-      const nums = arr.map(Number);
+      const nums = (arr || []).map(Number).filter(n => !isNaN(n));
+      if (nums.length === 0) {
+        return { mean: '0.00', min: '0.00', max: '0.00', std: '0.00' };
+      }
       const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
       const min = Math.min(...nums);
       const max = Math.max(...nums);

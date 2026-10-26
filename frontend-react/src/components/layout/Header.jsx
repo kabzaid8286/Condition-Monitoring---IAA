@@ -60,17 +60,23 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data, kp
             ))}
           </select>
         </div>
-        <div className="status-pill ok">
-          <div className="status-dot live"></div>
-          <span>Nominal</span>
+        <div className={`status-pill ${connectionMode === 'offline' ? 'warn' : 'ok'}`}>
+          <div className={`status-dot ${connectionMode === 'offline' ? 'warn' : 'live'}`} style={connectionMode === 'simulated' ? {background: '#8b5cf6'} : undefined}></div>
+          <span>{connectionMode === 'offline' ? 'Standby' : connectionMode === 'simulated' ? 'Simulating' : 'Nominal'}</span>
         </div>
-        {connectionMode === 'live' ? (
-          <div className="status-pill" title="Connected to FastAPI WebSocket telemetry hub" style={{background: "rgba(16,185,129,0.15)", color: "#10b981", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(16,185,129,0.3)"}}>
+        {connectionMode === 'live' && (
+          <div className="status-pill" title="Connected to hardware telemetry stream via FastAPI WebSocket" style={{background: "rgba(16,185,129,0.15)", color: "#10b981", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(16,185,129,0.3)"}}>
             <div className="status-dot" style={{background: "#10b981", animation: "pulse-dot 1s infinite"}}></div>Live WS (RPi 5)
           </div>
-        ) : (
-          <div className="status-pill" title="WebSocket offline - Running auto-simulation fallback" style={{background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(245,158,11,0.3)"}}>
-            <div className="status-dot" style={{background: "#f59e0b"}}></div>Simulated
+        )}
+        {connectionMode === 'offline' && (
+          <div className="status-pill" title="Microcontroller unplugged or serial gateway waiting for connection" style={{background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(245,158,11,0.3)"}}>
+            <div className="status-dot" style={{background: "#f59e0b"}}></div>Hardware Offline
+          </div>
+        )}
+        {connectionMode === 'simulated' && (
+          <div className="status-pill" title="Simulating custom asset telemetry based on defined physics parameters" style={{background: "rgba(139,92,246,0.15)", color: "#a78bfa", fontSize: "11px", padding: "4px 10px", border: "1px solid rgba(139,92,246,0.3)"}}>
+            <div className="status-dot" style={{background: "#8b5cf6", animation: "pulse-dot 1.5s infinite"}}></div>Virtual Simulation
           </div>
         )}
         {kpis && kpis.battery !== undefined && (
