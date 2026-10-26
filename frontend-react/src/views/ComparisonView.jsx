@@ -88,8 +88,7 @@ export default function ComparisonView() {
         {Object.entries(assets).map(([key, a]) => {
           const vib = a.basevib.toFixed(2);
           const temp = a.basetemp.toFixed(1);
-          const rpm = Math.round(a.baserpm);
-          const sc = key === 'test-rig-a' ? '0.23' : key === 'gearbox-02' ? '0.38' : '0.14';
+          const sc = '0.21';
           const vp = Math.min(100, (parseFloat(vib) / 15) * 100);
           const tp = Math.min(100, ((parseFloat(temp) - 20) / 80) * 100);
           const rp = Math.min(100, (rpm / 3000) * 100);

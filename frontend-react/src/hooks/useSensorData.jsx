@@ -35,26 +35,31 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
     activeAssetRef.current = activeAsset;
   }, [activeAsset]);
 
-  // Reset data buffers when activeAsset changes
-  useEffect(() => {
-    setData({
-      labels: [],
-      vibX: [],
-      vibY: [],
-      vibZ: [],
-      temp: [],
-      rpm: []
-    });
+  const prevAssetRef = useRef(activeAsset);
 
-    setKpis({
-      vibRms: '0.00',
-      temp: '0.0',
-      rpm: 0,
-      health: 100,
-      motorLoad: 0,
-      battery: 100,
-      burstState: 'idle'
-    });
+  // Only reset data buffers when activeAsset actually changes to a different asset
+  useEffect(() => {
+    if (prevAssetRef.current !== activeAsset) {
+      prevAssetRef.current = activeAsset;
+      setData({
+        labels: [],
+        vibX: [],
+        vibY: [],
+        vibZ: [],
+        temp: [],
+        rpm: []
+      });
+
+      setKpis({
+        vibRms: '0.00',
+        temp: '0.0',
+        rpm: 0,
+        health: 100,
+        motorLoad: 0,
+        battery: 100,
+        burstState: 'idle'
+      });
+    }
   }, [activeAsset]);
 
   // WebSocket Connection Management
@@ -85,35 +90,81 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
 
             if (payload.type === 'SNAPSHOT' && payload.data) {
               const currentReading = payload.data[activeAssetRef.current];
-              if (currentReading) {
+              if (currentReading && parseFloat(currentReading.vibX || 0) > 0) {
+                const timeStr = currentReading.time 
+                  ? new Date(currentReading.time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                  : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                const vx = parseFloat(currentReading.vibX).toFixed(2);
+                const vy = parseFloat(currentReading.vibY || 0).toFixed(2);
+                const vz = (parseFloat(vy) * 0.85).toFixed(2);
+                const tp = parseFloat(currentReading.temp || 0).toFixed(1);
+                const rp = Math.round(parseFloat(currentReading.rpm || 0));
+
                 setKpis(k => ({
                   ...k,
-                  vibRms: parseFloat(currentReading.vibX || 0).toFixed(2),
-                  temp: parseFloat(currentReading.temp || 0).toFixed(1),
-                  rpm: Math.round(parseFloat(currentReading.rpm || 0))
+                  vibRms: vx,
+                  temp: tp,
+                  rpm: rp,
+                  battery: currentReading.battery_pct !== undefined ? currentReading.battery_pct : k.battery,
+                  burstState: currentReading.burst_state || 'active'
                 }));
+
+                setData(prev => {
+                  if (prev.labels.length === 0) {
+                    return {
+                      labels: [timeStr],
+                      vibX: [vx],
+                      vibY: [vy],
+                      vibZ: [vz],
+                      temp: [tp],
+                      rpm: [rp]
+                    };
+                  }
+                  return prev;
+                });
               }
             } else if (payload.type === 'TELEMETRY' && payload.data) {
               const item = payload.data;
               if (item.asset_id === activeAssetRef.current) {
+                const rawVx = parseFloat(item.vibX || 0);
+                const rawVy = parseFloat(item.vibY || 0);
+                const rawTp = parseFloat(item.temp || 0);
+                const rawRp = Math.round(parseFloat(item.rpm || 0));
+                const burstSt = item.burst_state || 'active';
+
+                // If node is sleeping and sending zero placeholders, retain last known readings
+                if (rawVx === 0 && rawTp === 0 && burstSt === 'sleep') {
+                  setKpis(k => ({
+                    ...k,
+                    burstState: 'sleep',
+                    battery: item.battery_pct !== undefined ? item.battery_pct : k.battery
+                  }));
+                  return;
+                }
+
                 const timeStr = item.time 
                   ? new Date(item.time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
                   : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-                const vx = parseFloat(item.vibX).toFixed(2);
-                const vy = parseFloat(item.vibY).toFixed(2);
-                const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(2) : (parseFloat(item.vibY) * 0.85).toFixed(2);
-                const tp = parseFloat(item.temp).toFixed(1);
-                const rp = Math.round(parseFloat(item.rpm));
+                const vx = rawVx.toFixed(2);
+                const vy = rawVy.toFixed(2);
+                const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(2) : (rawVy * 0.85).toFixed(2);
+                const tp = rawTp.toFixed(1);
+                const rp = rawRp;
 
-                setData(prev => ({
-                  labels: [...prev.labels.slice(1), timeStr],
-                  vibX: [...prev.vibX.slice(1), vx],
-                  vibY: [...prev.vibY.slice(1), vy],
-                  vibZ: [...prev.vibZ.slice(1), vz],
-                  temp: [...prev.temp.slice(1), tp],
-                  rpm: [...prev.rpm.slice(1), rp]
-                }));
+                const maxPoints = 20;
+                setData(prev => {
+                  const slide = (arr, val) => arr.length >= maxPoints ? [...arr.slice(1), val] : [...arr, val];
+                  return {
+                    labels: slide(prev.labels, timeStr),
+                    vibX: slide(prev.vibX, vx),
+                    vibY: slide(prev.vibY, vy),
+                    vibZ: slide(prev.vibZ, vz),
+                    temp: slide(prev.temp, tp),
+                    rpm: slide(prev.rpm, rp)
+                  };
+                });
 
                 setKpis(k => ({
                   ...k,
@@ -123,7 +174,7 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
                   health: Math.max(60, Math.min(100, Math.round(100 - (parseFloat(vx) * 3.5)))),
                   motorLoad: Math.min(100, Math.round((rp / 3000) * 100)),
                   battery: item.battery_pct !== undefined ? item.battery_pct : (k.battery || 98),
-                  burstState: item.burst_state || 'active'
+                  burstState: burstSt
                 }));
               }
             }

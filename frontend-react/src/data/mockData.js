@@ -1,8 +1,5 @@
 export const ASSETS = {
-  'test-rig-a': { name: 'Test Rig A', label: 'Drive Train', basevib: 3.4, basetemp: 62, baserpm: 1482 },
-  'test-rig-b': { name: 'Test Rig B', label: 'Bearing Unit', basevib: 2.1, basetemp: 55, baserpm: 1200 },
-  'motor-01': { name: 'Motor 01', label: 'Induction 15 kW', basevib: 1.8, basetemp: 70, baserpm: 2950 },
-  'gearbox-02': { name: 'Gearbox 02', label: 'Helical Stage', basevib: 4.9, basetemp: 75, baserpm: 960 },
+  'test-rig-a': { name: 'Test Rig A', label: 'Drive Train / Test Rig', basevib: 2.4, basetemp: 45, baserpm: 1480 },
 };
 
 export const ML_MODELS = {
@@ -25,11 +22,9 @@ export const ML_MODELS = {
 };
 
 export const ALERT_DATA = [
-  { id: 1, sev: 'critical', title: 'High Vibration — Drive End', desc: 'Vibration RMS exceeded 8.0 mm/s. Bearing defect suspected.', asset: 'test-rig-a', time: '2026-08-17 23:21:04', acked: false },
-  { id: 2, sev: 'warning', title: 'Bearing Temperature Rising', desc: 'DE Bearing temp trending +2.3 °C over 30 min.', asset: 'test-rig-a', time: '2026-08-17 22:58:11', acked: false },
-  { id: 3, sev: 'warning', title: 'RPM Fluctuation Detected', desc: 'Shaft speed variance ±18 RPM above ±5 RPM tolerance.', asset: 'motor-01', time: '2026-08-17 22:40:33', acked: false },
-  { id: 4, sev: 'info', title: 'Scheduled Maintenance Due', desc: 'Lubricant change interval (500 h) reached — Gearbox 02.', asset: 'gearbox-02', time: '2026-08-17 21:00:00', acked: false },
-  { id: 5, sev: 'info', title: 'ML Model Retrained', desc: 'LSTM retrained on latest 7-day data. F1: 0.93 → 0.94.', asset: 'all', time: '2026-08-17 20:00:00', acked: true },
+  { id: 1, sev: 'critical', title: 'High Vibration — Drive End', desc: 'Vibration RMS exceeded 8.0 mm/s. Bearing defect suspected.', asset: 'test-rig-a', time: '2026-10-26 20:20:00', acked: false },
+  { id: 2, sev: 'warning', title: 'Bearing Temperature Monitoring', desc: 'DE Bearing temp nominal at 45.0 °C.', asset: 'test-rig-a', time: '2026-10-26 20:15:00', acked: false },
+  { id: 3, sev: 'info', title: 'Hardware Node Connected', desc: 'Seeed Studio XIAO active streaming on Test Rig A.', asset: 'test-rig-a', time: '2026-10-26 20:07:00', acked: true },
 ];
 
 export const ANOMALY_EVENTS = [

@@ -19,10 +19,7 @@ class TelemetryHub:
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
         self.latest_readings: Dict[str, Dict[str, Any]] = {
-            "test-rig-a": {"vibX": 3.42, "vibY": 1.88, "temp": 62.1, "rpm": 1482.0, "time": datetime.now(timezone.utc).isoformat()},
-            "test-rig-b": {"vibX": 2.10, "vibY": 1.15, "temp": 55.0, "rpm": 1200.0, "time": datetime.now(timezone.utc).isoformat()},
-            "motor-01":   {"vibX": 1.80, "vibY": 0.99, "temp": 70.2, "rpm": 2950.0, "time": datetime.now(timezone.utc).isoformat()},
-            "gearbox-02": {"vibX": 4.90, "vibY": 2.69, "temp": 75.1, "rpm": 960.0,  "time": datetime.now(timezone.utc).isoformat()},
+            "test-rig-a": {"asset_id": "test-rig-a", "vibX": 2.40, "vibY": 1.25, "temp": 45.0, "rpm": 1480.0, "battery_pct": 100, "burst_state": "active", "time": datetime.now(timezone.utc).isoformat()}
         }
         self.mqtt_client: mqtt.Client = None
         self._loop = None
@@ -59,14 +56,31 @@ class TelemetryHub:
             asset_id = payload.get("asset_id", "test-rig-a")
             sensors = payload.get("sensors", {})
 
+            previous = self.latest_readings.get(asset_id, {})
+            raw_vx = float(sensors.get("vibration_x", 0.0))
+            raw_temp = float(sensors.get("temperature", 0.0))
+            burst_st = str(sensors.get("burst_state", "active"))
+
+            # Retain last valid readings during duty-cycle sleep so dashboard never zeroes out
+            if raw_vx == 0.0 and raw_temp == 0.0 and burst_st == "sleep" and float(previous.get("vibX", 0.0)) > 0.0:
+                vx = previous.get("vibX", 0.0)
+                vy = previous.get("vibY", 0.0)
+                tp = previous.get("temp", 0.0)
+                rp = previous.get("rpm", 1480.0)
+            else:
+                vx = raw_vx
+                vy = float(sensors.get("vibration_y", 0.0))
+                tp = raw_temp
+                rp = float(sensors.get("rpm", 1480.0))
+
             data_item = {
                 "asset_id": asset_id,
-                "vibX": sensors.get("vibration_x", 0.0),
-                "vibY": sensors.get("vibration_y", 0.0),
-                "temp": sensors.get("temperature", 0.0),
-                "rpm": sensors.get("rpm", 0.0),
+                "vibX": vx,
+                "vibY": vy,
+                "temp": tp,
+                "rpm": rp,
                 "battery_pct": sensors.get("battery_pct", 100),
-                "burst_state": sensors.get("burst_state", "active"),
+                "burst_state": burst_st,
                 "time": payload.get("timestamp", datetime.now(timezone.utc).isoformat())
             }
 

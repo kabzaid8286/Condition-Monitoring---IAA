@@ -26,10 +26,7 @@ DEFAULT_GATEWAY_ID = "rpi5-iaa-node-01"
 DEFAULT_BAUD_RATE = 115200
 
 ASSET_BASELINES = {
-    "test-rig-a": {"name": "Test Rig A", "basevib": 3.4, "basetemp": 62.0, "baserpm": 1482.0},
-    "test-rig-b": {"name": "Test Rig B", "basevib": 2.1, "basetemp": 55.0, "baserpm": 1200.0},
-    "motor-01":   {"name": "Motor 01",   "basevib": 1.8, "basetemp": 70.0, "baserpm": 2950.0},
-    "gearbox-02": {"name": "Gearbox 02", "basevib": 4.9, "basetemp": 75.0, "baserpm": 960.0},
+    "test-rig-a": {"name": "Test Rig A", "basevib": 2.4, "basetemp": 45.0, "baserpm": 1480.0},
 }
 
 
@@ -59,6 +56,7 @@ class SensorReader:
         self.ticks = 0
         self.baseline = ASSET_BASELINES.get(asset_id, ASSET_BASELINES["test-rig-a"])
         self.serial_conn = None
+        self.last_reading = None
 
         if self.mode == "serial":
             self._init_serial()
@@ -98,14 +96,24 @@ class SensorReader:
                     continue
                 if line.startswith("{") and line.endswith("}"):
                     data = json.loads(line)
-                    return {
-                        "vibration_x": float(data.get("vibration_x", data.get("vib_x", 0.0))),
-                        "vibration_y": float(data.get("vibration_y", data.get("vib_y", 0.0))),
-                        "temperature": float(data.get("temperature", data.get("temp", 0.0))),
-                        "rpm": float(data.get("rpm", 1500.0)),
-                        "battery_pct": int(data.get("battery_pct", data.get("battery", 100))),
-                        "burst_state": str(data.get("burst_state", "active"))
-                    }
+                    if data.get("burst_state") == "sleep":
+                        if self.last_reading:
+                            sleep_reading = dict(self.last_reading)
+                            sleep_reading["burst_state"] = "sleep"
+                            return sleep_reading
+                        continue
+
+                    if "vibration_x" in data or "vib_x" in data:
+                        reading = {
+                            "vibration_x": float(data.get("vibration_x", data.get("vib_x", 0.0))),
+                            "vibration_y": float(data.get("vibration_y", data.get("vib_y", 0.0))),
+                            "temperature": float(data.get("temperature", data.get("temp", 0.0))),
+                            "rpm": float(data.get("rpm", 1480.0)),
+                            "battery_pct": int(data.get("battery_pct", data.get("battery", 100))),
+                            "burst_state": str(data.get("burst_state", "active"))
+                        }
+                        self.last_reading = reading
+                        return reading
                 else:
                     print(f"[XIAO LOG] {line}")
             except (json.JSONDecodeError, ValueError) as err:

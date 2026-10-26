@@ -46,9 +46,9 @@ async def get_historical_telemetry(
 ) -> Dict[str, Any]:
     """Retrieve time-series trend data for historical charts"""
     pts = 24 if time_range == "1D" else 42 if time_range == "7D" else 60
-    base_vib = 3.4 if asset_id == "test-rig-a" else 2.1 if asset_id == "test-rig-b" else 1.8 if asset_id == "motor-01" else 4.9
-    base_temp = 62.0 if asset_id == "test-rig-a" else 55.0 if asset_id == "test-rig-b" else 70.0 if asset_id == "motor-01" else 75.0
-    base_rpm = 1482.0 if asset_id == "test-rig-a" else 1200.0 if asset_id == "test-rig-b" else 2950.0 if asset_id == "motor-01" else 960.0
+    base_vib = 2.4
+    base_temp = 45.0
+    base_rpm = 1480.0
 
     now = datetime.datetime.now(datetime.timezone.utc)
     delta_seconds = 3600 if time_range == "1D" else 14400 if time_range == "7D" else 43200
