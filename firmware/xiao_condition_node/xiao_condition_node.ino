@@ -22,10 +22,11 @@
 #define ASSET_ID            "test-rig-a"
 #define BAUD_RATE           115200
 
-// Duty cycle: 10 seconds of streaming, followed by ~290 seconds of Deep Sleep
-#define BURST_DURATION_MS   10000UL      // 10 seconds burst
-#define SLEEP_DURATION_SEC  290ULL       // 4 min 50 sec sleep (~5 min cycle)
-#define SAMPLE_INTERVAL_MS  1000UL       // 1 Hz sample rate during burst (or 100ms for 10Hz)
+// Duty cycle: 10 seconds of streaming, followed by sleep
+// (Set SLEEP_DURATION_SEC to 290 for 5-minute industrial battery deployment)
+#define BURST_DURATION_MS   10000UL      // 10 seconds active burst
+#define SLEEP_DURATION_SEC  5ULL         // 5 seconds sleep for bench testing (set 290 for field deployment)
+#define SAMPLE_INTERVAL_MS  500UL        // 500ms sample rate (2 Hz) for live dashboard streaming
 
 // Pin definitions (Cross-compatible across all Seeed Studio XIAO boards: ESP32-C3, ESP32-S3, RP2040, SAMD21)
 #if defined(A0)

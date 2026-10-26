@@ -64,19 +64,24 @@ class SensorReader:
             self._init_serial()
 
     def _init_serial(self):
-        """Initialize USB serial connection to Seeed Studio XIAO"""
+        """Initialize USB serial connection to Seeed Studio XIAO with resilient auto-reconnect"""
         import serial
-        target_port = self.port or find_serial_port()
-        if not target_port:
-            print("⚠️ No USB microcontroller port detected automatically.")
-            print("   Available ports:", glob.glob("/dev/cu.*")[:4] or "None")
-            print("   Please check USB-C connection or specify --serial-port manually.")
-            raise ConnectionError("USB Serial port not found")
-        
-        print(f"🔌 Opening USB Serial port: {target_port} at {self.baud} baud...")
-        self.serial_conn = serial.Serial(target_port, self.baud, timeout=2.0)
-        time.sleep(1.5)  # Allow DTR / board reset to stabilize
-        print(f"✅ Connected to Seeed Studio XIAO on {target_port}")
+        while True:
+            target_port = self.port or find_serial_port()
+            if not target_port:
+                print("Waiting for Seeed Studio XIAO USB connection (retrying in 2s)...")
+                time.sleep(2)
+                continue
+            
+            try:
+                print(f"Opening USB Serial port: {target_port} at {self.baud} baud...")
+                self.serial_conn = serial.Serial(target_port, self.baud, timeout=2.0)
+                time.sleep(1.5)  # Allow DTR / board reset to stabilize
+                print(f"Connected to Seeed Studio XIAO on {target_port}")
+                return
+            except Exception as err:
+                print(f"Unable to open {target_port}: {err}. Retrying in 2s...")
+                time.sleep(2)
 
     def read_telemetry(self):
         """Read sensor data from Serial hardware or simulation model"""
