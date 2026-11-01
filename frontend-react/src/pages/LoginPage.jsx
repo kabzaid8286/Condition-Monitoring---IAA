@@ -12,7 +12,15 @@ export default function LoginPage({ onLogin, onNavigate }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const attemptLogin = async (requestedRole) => {
-    if (!credentials.id || !credentials.password) {
+    let targetId = credentials.id?.trim();
+    let targetPass = credentials.password;
+
+    // Convenient demo fallback if clicked without typing credentials
+    if (!targetId && !targetPass) {
+      targetId = requestedRole === 'admin' ? 'admin' : 'user';
+      targetPass = requestedRole === 'admin' ? 'admin123' : 'user123';
+      setCredentials({ id: targetId, password: targetPass });
+    } else if (!targetId || !targetPass) {
       toast('Please enter both User ID and Password.', 'error');
       return;
     }
@@ -25,8 +33,8 @@ export default function LoginPage({ onLogin, onNavigate }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: credentials.id,
-          password: credentials.password
+          username: targetId,
+          password: targetPass
         })
       });
 
@@ -66,9 +74,9 @@ export default function LoginPage({ onLogin, onNavigate }) {
       }
     } catch (err) {
       console.warn('Backend auth unreachable, checking local credentials fallback:', err);
-      const cleanId = (credentials.id || '').trim().toLowerCase();
+      const cleanId = (targetId || '').trim().toLowerCase();
       if (requestedRole === 'admin') {
-        if (cleanId === 'admin' && credentials.password === 'admin123') {
+        if (cleanId === 'admin' && targetPass === 'admin123') {
           onLogin('admin');
         } else if (cleanId === 'user') {
           toast('Access denied. Administrator privileges required to log in as Admin.', 'error');
@@ -79,7 +87,7 @@ export default function LoginPage({ onLogin, onNavigate }) {
         // requestedRole === 'user'
         if (cleanId === 'admin') {
           toast('Administrator account detected. Please use the "Login as Admin" button.', 'info');
-        } else if (cleanId === 'user' && credentials.password === 'user123') {
+        } else if (cleanId === 'user' && targetPass === 'user123') {
           onLogin('user');
         } else {
           toast('Invalid user credentials or backend unavailable.', 'error');
