@@ -167,18 +167,24 @@ function FFTCanvas({ tickCount }) {
   return <canvas ref={canvasRef} style={{ width: '100%', height: '140px', display: 'block' }} />;
 }
 
-export default function LiveTelemetryView({ data }) {
+export default function LiveTelemetryView({ data = {} }) {
+  const vibX = data?.vibX || [];
+  const vibY = data?.vibY || [];
+  const temp = data?.temp || [];
+  const rpm = data?.rpm || [];
+  const labels = data?.labels || [];
+
   // Get latest values
-  const lastVib = data.vibX[data.vibX.length - 1] || 0;
-  const lastTemp = data.temp[data.temp.length - 1] || 0;
-  const lastRpm = data.rpm[data.rpm.length - 1] || 0;
+  const lastVib = vibX.length > 0 ? vibX[vibX.length - 1] : 0;
+  const lastTemp = temp.length > 0 ? temp[temp.length - 1] : 0;
+  const lastRpm = rpm.length > 0 ? rpm[rpm.length - 1] : 0;
 
   const combinedData = {
-    labels: data.labels,
+    labels: labels,
     datasets: [
       {
         label: 'Vibration X',
-        data: data.vibX,
+        data: vibX,
         borderColor: '#3b82f6',
         borderWidth: 2,
         tension: 0.4,
@@ -186,7 +192,7 @@ export default function LiveTelemetryView({ data }) {
       },
       {
         label: 'Vibration Y',
-        data: data.vibY,
+        data: vibY,
         borderColor: '#06b6d4',
         borderWidth: 2,
         tension: 0.4,
@@ -194,7 +200,7 @@ export default function LiveTelemetryView({ data }) {
       },
       {
         label: 'Temperature',
-        data: data.temp,
+        data: temp,
         borderColor: '#10b981',
         borderWidth: 2,
         tension: 0.4,
@@ -202,7 +208,7 @@ export default function LiveTelemetryView({ data }) {
       },
       {
         label: 'RPM (scaled)',
-        data: data.rpm.map(r => (r / 25).toFixed(2)),
+        data: rpm.map(r => (parseFloat(r || 0) / 25).toFixed(2)),
         borderColor: '#f59e0b',
         borderWidth: 2,
         tension: 0.4,
@@ -275,7 +281,7 @@ export default function LiveTelemetryView({ data }) {
           <div className="badge blue">Live</div>
         </div>
         <div className="chart-wrap" style={{ height: "180px" }}>
-          <FFTCanvas tickCount={data.labels.length} />
+          <FFTCanvas tickCount={labels.length} />
         </div>
       </div>
     </>

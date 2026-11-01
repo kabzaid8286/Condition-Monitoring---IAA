@@ -10,6 +10,7 @@ import ComparisonView from '../views/ComparisonView';
 import OverviewView from '../views/OverviewView';
 import TestDesignView from '../views/TestDesignView';
 import AnalysisView from '../views/AnalysisView';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import useSensorData from '../hooks/useSensorData';
 
 export default function DashboardPage({ userRole, onLogout }) {
@@ -55,15 +56,17 @@ export default function DashboardPage({ userRole, onLogout }) {
         <Sidebar userRole={userRole} activeView={activeView} setActiveView={handleSelectView} onLogout={onLogout} />
         
         <main className="main-content">
-          {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={handleSelectAsset} />}
-          {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
-          {activeView === 'realtime' && <LiveTelemetryView data={data} />}
-          {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} />}
-          {activeView === 'ml-models' && <MlModelsView data={data} />}
-          {activeView === 'alerts' && <AlertsView />}
-          {activeView === 'comparison' && <ComparisonView data={data} />}
-          {activeView === 'analysis' && <AnalysisView data={data} activeAsset={activeAsset} />}
-          {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
+          <ErrorBoundary>
+            {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={handleSelectAsset} />}
+            {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
+            {activeView === 'realtime' && <LiveTelemetryView data={data} />}
+            {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} />}
+            {activeView === 'ml-models' && <MlModelsView data={data} />}
+            {activeView === 'alerts' && <AlertsView />}
+            {activeView === 'comparison' && <ComparisonView data={data} />}
+            {activeView === 'analysis' && <AnalysisView data={data} activeAsset={activeAsset} />}
+            {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
+          </ErrorBoundary>
         </main>
       </div>
     </div>
