@@ -1,5 +1,5 @@
 export const ASSETS = {
-  'test-rig-a': { name: 'Test Rig A', label: 'Drive Train / Test Rig', basevib: 2.4, basetemp: 45, baserpm: 1480 },
+  'test-rig-a': { name: 'Test Rig A', label: 'Drive Train / Test Rig', basevib: 0, basetemp: 0, baserpm: 0 },
 };
 
 export const ML_MODELS = {

@@ -3,17 +3,40 @@ import { Line } from 'react-chartjs-2';
 import { ML_MODELS } from '../data/mockData';
 import '../components/charts/ChartConfig';
 
-export default function MlModelsView({ data = { vibX: [], vibY: [], temp: [], rpm: [] } }) {
+export default function MlModelsView({ data = { vibX: [], vibY: [], temp: [], rpm: [] }, isConnected = false }) {
   const [activeModel, setActiveModel] = useState('lstm');
 
-  // Extract live telemetry from connected hardware node (Test Rig A)
-  const currentVibX = parseFloat(data?.vibX?.[data.vibX.length - 1] || 2.4);
-  const currentVibY = parseFloat(data?.vibY?.[data.vibY.length - 1] || 1.2);
-  const currentTemp = parseFloat(data?.temp?.[data.temp.length - 1] || 45.0);
-  const currentRpm = parseFloat(data?.rpm?.[data.rpm.length - 1] || 1480);
+  // Extract live telemetry from connected hardware node
+  const currentVibX = parseFloat(data?.vibX?.[data.vibX.length - 1] || 0);
+  const currentVibY = parseFloat(data?.vibY?.[data.vibY.length - 1] || 0);
+  const currentTemp = parseFloat(data?.temp?.[data.temp.length - 1] || 0);
+  const currentRpm = parseFloat(data?.rpm?.[data.rpm.length - 1] || 0);
+
+  const isLive = isConnected && (currentVibX > 0 || currentTemp > 0);
 
   // Dynamic real-time ML metrics driven by connected hardware:
   const liveModels = useMemo(() => {
+    if (!isLive) {
+      const offlineModel = (label, acc, prec, rec, f1, lat) => ({
+        label, accuracy: acc, precision: prec, recall: rec, f1, latency: lat,
+        anomalyScore: 0.00,
+        rul: '--',
+        faults: [
+          { label: 'Imbalance (1X)', state: 'none' },
+          { label: 'Shaft Misalignment', state: 'none' },
+          { label: 'Bearing Wear (BPFO)', state: 'none' },
+          { label: 'Mechanical Looseness', state: 'none' }
+        ]
+      });
+
+      return {
+        lstm: offlineModel('LSTM Autoencoder', 94.2, 92.8, 95.1, 93.9, '24ms'),
+        rf: offlineModel('Random Forest', 91.7, 90.4, 92.3, 91.3, '8ms'),
+        xgb: offlineModel('XGBoost', 93.1, 91.9, 94.0, 92.9, '12ms'),
+        cnn: offlineModel('1D-CNN', 95.6, 94.3, 96.1, 95.2, '42ms')
+      };
+    }
+
     // ISO 10816-3 thresholds: <2.8 mm/s Good, >4.5 Warning, >7.1 Critical
     const vibStress = Math.max(0, currentVibX - 1.5) / 6.0;
     const tempStress = Math.max(0, currentTemp - 40.0) / 40.0;

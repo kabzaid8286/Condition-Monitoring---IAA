@@ -88,7 +88,7 @@ function DialGauge({ value, min, max, unit, label, color, warnThreshold, critThr
   );
 }
 
-function FFTCanvas({ tickCount }) {
+function FFTCanvas({ tickCount, isLive, lastVib = 0 }) {
   const canvasRef = useRef(null);
   const binsRef = useRef([]);
 
@@ -110,25 +110,6 @@ function FFTCanvas({ tickCount }) {
     const cw = w - pad.left - pad.right;
     const ch = h - pad.top - pad.bottom;
 
-    // Initialize or jitter bins
-    if (binsRef.current.length !== 60) {
-      const newBins = [];
-      for (let i = 0; i < 60; i++) {
-        const hz = (i / 60) * 500;
-        let v = 0.05;
-        if (Math.abs(hz - 25) < 5) v = 0.35 + (Math.random() * 0.1);
-        if (Math.abs(hz - 50) < 4) v = 0.22 + (Math.random() * 0.08);
-        if (Math.abs(hz - 87) < 6) v = 0.68 + (Math.random() * 0.1);
-        if (Math.abs(hz - 150) < 3) v = 0.15 + (Math.random() * 0.05);
-        newBins.push(v + (Math.random() * 0.04 - 0.02));
-      }
-      binsRef.current = newBins;
-    } else {
-      binsRef.current = binsRef.current.map(v => Math.min(1, Math.max(0.03, v + (Math.random() * 0.02 - 0.01))));
-    }
-
-    const bins = binsRef.current;
-
     ctx.clearRect(0, 0, w, h);
 
     // Grid lines
@@ -141,6 +122,50 @@ function FFTCanvas({ tickCount }) {
       ctx.lineTo(pad.left + cw, y);
       ctx.stroke();
     });
+
+    // If disconnected or zero vibration, show flatline / standby notice
+    const vibNum = parseFloat(lastVib) || 0;
+    if (!isLive || vibNum <= 0) {
+      // Quiet zero baseline
+      ctx.beginPath();
+      ctx.moveTo(pad.left, pad.top + ch);
+      ctx.lineTo(pad.left + cw, pad.top + ch);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Hardware Disconnected — Spectrum Inactive (0.00 mm/s)', w / 2, h / 2);
+
+      // X-axis text
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '10px JetBrains Mono, monospace';
+      [0, 100, 200, 300, 400, 500].forEach(hz => {
+        ctx.fillText(hz + 'Hz', pad.left + (hz / 500) * cw, pad.top + ch + 16);
+      });
+      return;
+    }
+
+    // Live active stream: scale FFT bins based on actual live vibration amplitude
+    const scaleFactor = Math.min(2.0, vibNum / 2.5);
+    if (binsRef.current.length !== 60) {
+      const newBins = [];
+      for (let i = 0; i < 60; i++) {
+        const hz = (i / 60) * 500;
+        let v = 0.04 * scaleFactor;
+        if (Math.abs(hz - 25) < 5) v = 0.35 * scaleFactor;
+        if (Math.abs(hz - 50) < 4) v = 0.22 * scaleFactor;
+        if (Math.abs(hz - 87) < 6) v = 0.68 * scaleFactor;
+        if (Math.abs(hz - 150) < 3) v = 0.15 * scaleFactor;
+        newBins.push(v);
+      }
+      binsRef.current = newBins;
+    } else {
+      binsRef.current = binsRef.current.map(v => Math.min(1, Math.max(0.02, v * 0.9 + (Math.random() * 0.05 * scaleFactor))));
+    }
+
+    const bins = binsRef.current;
 
     // Bars
     const bw = (cw / bins.length) * 0.7;
@@ -162,12 +187,12 @@ function FFTCanvas({ tickCount }) {
     [0, 100, 200, 300, 400, 500].forEach(hz => {
       ctx.fillText(hz + 'Hz', pad.left + (hz / 500) * cw, pad.top + ch + 16);
     });
-  }, [tickCount]);
+  }, [tickCount, isLive, lastVib]);
 
   return <canvas ref={canvasRef} style={{ width: '100%', height: '140px', display: 'block' }} />;
 }
 
-export default function LiveTelemetryView({ data = {} }) {
+export default function LiveTelemetryView({ data = {}, isConnected = false }) {
   const vibX = data?.vibX || [];
   const vibY = data?.vibY || [];
   const temp = data?.temp || [];
@@ -278,10 +303,16 @@ export default function LiveTelemetryView({ data = {} }) {
       <div className="card" style={{ marginTop: "16px" }}>
         <div className="card-header">
           <div className="card-title">Frequency Spectrum (FFT)</div>
-          <div className="badge blue">Live</div>
+          <div className={`badge ${isConnected || parseFloat(lastVib || 0) > 0 ? 'blue' : 'warn'}`}>
+            {isConnected || parseFloat(lastVib || 0) > 0 ? 'Live' : 'Standby (0.00 mm/s)'}
+          </div>
         </div>
         <div className="chart-wrap" style={{ height: "180px" }}>
-          <FFTCanvas tickCount={labels.length} />
+          <FFTCanvas 
+            tickCount={labels.length} 
+            isLive={isConnected || parseFloat(lastVib || 0) > 0} 
+            lastVib={lastVib} 
+          />
         </div>
       </div>
     </>

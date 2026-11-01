@@ -3,7 +3,7 @@ import { Line } from 'react-chartjs-2';
 import { useAssets } from '../contexts/AssetContext';
 import '../components/charts/ChartConfig';
 
-export default function ComparisonView() {
+export default function ComparisonView({ data: activeData = {}, isConnected = false, activeAsset = 'test-rig-a' }) {
   const { assets } = useAssets();
 
   const assetColors = {
@@ -13,21 +13,47 @@ export default function ComparisonView() {
     'gearbox-02': '#f43f5e'
   };
 
-  // Generate comparative historical series for all assets
-  const chartData = useMemo(() => {
-    const timeLabels = Array.from({ length: 40 }, (_, i) => `${i * 2}m ago`).reverse();
+  // Helper to retrieve recorded historical points for an asset or zeros
+  const getAssetReadings = (key, count = 20) => {
+    if (key === activeAsset && isConnected && activeData?.vibX?.length > 0) {
+      return activeData;
+    }
 
-    const datasets = Object.entries(assets).map(([key, a], ci) => {
-      const baseV = parseFloat(a.basevib) || 2.4;
-      const data = Array.from({ length: 40 }, (_, i) => {
-        const wave = Math.sin(i * 0.2 + ci * 1.5) * 0.35;
-        const noise = (Math.sin(i * 4.3 + ci * 2.1) * 0.15);
-        return parseFloat((baseV + wave + noise).toFixed(2));
-      });
+    try {
+      const saved = localStorage.getItem(`recorded_telemetry_${key}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.vibX) && parsed.vibX.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Zero / standby fallback
+    return {
+      labels: Array.from({ length: count }, (_, i) => `${(count - i) * 2}m ago`),
+      vibX: Array.from({ length: count }, () => '0.00'),
+      temp: Array.from({ length: count }, () => '0.0'),
+      rpm: Array.from({ length: count }, () => 0)
+    };
+  };
+
+  // Generate comparative historical series for all assets using real recorded data or zero
+  const chartData = useMemo(() => {
+    const timeLabels = Array.from({ length: 20 }, (_, i) => `${(20 - i) * 2}m ago`);
+
+    const datasets = Object.entries(assets).map(([key, a]) => {
+      const readings = getAssetReadings(key, 20);
+      const points = (readings?.vibX || []).slice(-20).map(v => parseFloat(v || 0));
+      while (points.length < 20) {
+        points.unshift(0.00);
+      }
 
       return {
         label: a.name,
-        data,
+        data: points,
         borderColor: assetColors[key] || '#8b5cf6',
         backgroundColor: 'transparent',
         borderWidth: 2,
@@ -41,7 +67,7 @@ export default function ComparisonView() {
       labels: timeLabels,
       datasets
     };
-  }, [assets]);
+  }, [assets, activeData, isConnected, activeAsset]);
 
   const chartOptions = {
     responsive: true,
@@ -84,21 +110,41 @@ export default function ComparisonView() {
     <>
       <div>
         <div className="page-title">Asset Comparison</div>
-        <div className="page-title-sub">Side-by-side live metrics for multiple machines</div>
+        <div className="page-title-sub">Side-by-side metrics across active, recorded, and standby sensor nodes</div>
       </div>
 
       <div className="comparison-grid" id="comparison-grid" style={{ marginTop: '20px' }}>
         {Object.entries(assets).map(([key, a]) => {
-          const vib = (parseFloat(a.basevib) || 2.4).toFixed(2);
-          const temp = (parseFloat(a.basetemp) || 45.0).toFixed(1);
-          const rpm = Math.round(parseFloat(a.baserpm) || 1480);
-          const sc = (parseFloat(vib) / 10).toFixed(2);
-          const vp = Math.min(100, Math.max(0, (parseFloat(vib) / 15) * 100));
-          const tp = Math.min(100, Math.max(0, ((parseFloat(temp) - 20) / 80) * 100));
+          const readings = getAssetReadings(key);
+          const hasData = readings && readings.vibX && readings.vibX.length > 0;
+          const isThisActive = key === activeAsset && isConnected;
+
+          const rawVib = isThisActive 
+            ? parseFloat(readings.vibX[readings.vibX.length - 1] || 0)
+            : hasData ? parseFloat(readings.vibX[readings.vibX.length - 1] || 0) : 0;
+          
+          const rawTemp = isThisActive 
+            ? parseFloat(readings.temp[readings.temp.length - 1] || 0)
+            : hasData ? parseFloat(readings.temp[readings.temp.length - 1] || 0) : 0;
+
+          const rawRpm = isThisActive 
+            ? Math.round(parseFloat(readings.rpm[readings.rpm.length - 1] || 0))
+            : hasData ? Math.round(parseFloat(readings.rpm[readings.rpm.length - 1] || 0)) : 0;
+
+          const vib = rawVib.toFixed(2);
+          const temp = rawTemp.toFixed(1);
+          const rpm = rawRpm;
+          const sc = (rawVib / 10).toFixed(2);
+          const vp = Math.min(100, Math.max(0, (rawVib / 15) * 100));
+          const tp = Math.min(100, Math.max(0, ((rawTemp - 20) / 80) * 100));
           const rp = Math.min(100, Math.max(0, (rpm / 3000) * 100));
-          const isCaution = parseFloat(vib) > 4;
-          const sColor = isCaution ? 'var(--amber)' : 'var(--green)';
-          const sText = isCaution ? 'Caution' : 'Nominal';
+
+          const sColor = isThisActive 
+            ? (rawVib > 4 ? 'var(--amber)' : 'var(--green)') 
+            : 'var(--text-muted)';
+          const sText = isThisActive 
+            ? (rawVib > 4 ? 'Caution' : 'Live Nominal') 
+            : (rawVib > 0 ? 'Recorded Session' : 'Standby (0 Telemetry)');
 
           return (
             <div key={key} className="card comparison-card">

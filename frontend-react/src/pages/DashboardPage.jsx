@@ -58,12 +58,12 @@ export default function DashboardPage({ userRole, onLogout }) {
         <main className="main-content">
           <ErrorBoundary>
             {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={handleSelectAsset} />}
-            {activeView === 'overview' && <OverviewView kpis={kpis} data={data} />}
-            {activeView === 'realtime' && <LiveTelemetryView data={data} />}
+            {activeView === 'overview' && <OverviewView kpis={kpis} data={data} isConnected={isConnected} />}
+            {activeView === 'realtime' && <LiveTelemetryView data={data} isConnected={isConnected} />}
             {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} />}
-            {activeView === 'ml-models' && <MlModelsView data={data} />}
+            {activeView === 'ml-models' && <MlModelsView data={data} isConnected={isConnected} />}
             {activeView === 'alerts' && <AlertsView />}
-            {activeView === 'comparison' && <ComparisonView data={data} />}
+            {activeView === 'comparison' && <ComparisonView data={data} isConnected={isConnected} activeAsset={activeAsset} />}
             {activeView === 'analysis' && <AnalysisView data={data} activeAsset={activeAsset} />}
             {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
           </ErrorBoundary>

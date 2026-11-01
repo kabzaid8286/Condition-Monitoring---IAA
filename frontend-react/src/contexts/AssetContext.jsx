@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useCallback } from 'react';
 import { ASSETS as initialAssets } from '../data/mockData';
 
 const AssetContext = createContext();
@@ -18,34 +18,87 @@ export const AssetProvider = ({ children }) => {
     return initialAssets;
   });
 
-  const addAsset = (id, newAsset) => {
-    const assetWithFlag = { ...newAsset, isCustom: true };
-    setAssets(prev => {
-      const updated = { ...prev, [id]: assetWithFlag };
-      try {
-        localStorage.setItem('condition_monitoring_assets', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Error saving assets to localStorage:', e);
-      }
-      return updated;
-    });
+  const saveAssets = (newAssets) => {
+    try {
+      localStorage.setItem('condition_monitoring_assets', JSON.stringify(newAssets));
+    } catch (e) {
+      console.warn('Error saving assets to localStorage:', e);
+    }
   };
 
-  const removeAsset = (id) => {
+  const addAsset = useCallback((id, newAsset) => {
+    setAssets(prev => {
+      const updated = {
+        ...prev,
+        [id]: {
+          name: newAsset.name || `Sensor Node-${id}`,
+          label: newAsset.label || 'Configured Sensor Node',
+          basevib: 0,
+          basetemp: 0,
+          baserpm: 0,
+          isCustom: true,
+          ...newAsset
+        }
+      };
+      saveAssets(updated);
+      return updated;
+    });
+  }, []);
+
+  const updateAsset = useCallback((id, updatedFields) => {
+    setAssets(prev => {
+      if (!prev[id]) return prev;
+      const updated = {
+        ...prev,
+        [id]: {
+          ...prev[id],
+          ...updatedFields
+        }
+      };
+      saveAssets(updated);
+      return updated;
+    });
+  }, []);
+
+  const autoRegisterSensor = useCallback((id, optionalName) => {
+    setAssets(prev => {
+      if (prev[id]) return prev; // Already registered
+
+      // Generate a friendly name if none provided
+      const cleanId = String(id || '').trim();
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
+      const generatedName = optionalName 
+        || (cleanId.startsWith('sensor') ? `Sensor Node ${cleanId.replace(/^sensor-?/i, '')}` : `Sensor Node-${randomSuffix}`);
+
+      const newAsset = {
+        name: generatedName,
+        label: 'Auto-Detected Hardware Node',
+        basevib: 0,
+        basetemp: 0,
+        baserpm: 0,
+        isAutoDetected: true
+      };
+
+      const updated = { ...prev, [cleanId]: newAsset };
+      saveAssets(updated);
+      return updated;
+    });
+  }, []);
+
+  const removeAsset = useCallback((id) => {
+    // Prevent removing the primary test-rig-a
+    if (id === 'test-rig-a') return;
+
     setAssets(prev => {
       const copy = { ...prev };
       delete copy[id];
-      try {
-        localStorage.setItem('condition_monitoring_assets', JSON.stringify(copy));
-      } catch (e) {
-        console.warn('Error saving assets to localStorage:', e);
-      }
+      saveAssets(copy);
       return copy;
     });
-  };
+  }, []);
 
   return (
-    <AssetContext.Provider value={{ assets, addAsset, removeAsset }}>
+    <AssetContext.Provider value={{ assets, addAsset, updateAsset, autoRegisterSensor, removeAsset }}>
       {children}
     </AssetContext.Provider>
   );
