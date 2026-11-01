@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     
     # MQTT
     MQTT_BROKER_URL: str = "mqtt://localhost:1883"
+    MQTT_BROKER_HOST: str = "localhost"
+    MQTT_BROKER_PORT: int = 1883
     
     # JWT
     JWT_SECRET_KEY: str = "your-super-secret-key"

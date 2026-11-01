@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     
     # Start MQTT Background Service for Raspberry Pi 5 telemetry
     loop = asyncio.get_running_loop()
-    hub.start_mqtt(broker_host="localhost", broker_port=1883, loop=loop)
+    hub.start_mqtt(broker_host=settings.MQTT_BROKER_HOST, broker_port=settings.MQTT_BROKER_PORT, loop=loop)
     
     yield
     
