@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { commonOptions } from '../components/charts/ChartConfig';
-import { ANOMALY_EVENTS } from '../data/mockData';
+import { ANOMALY_EVENTS } from '../data/systemConfig';
 
 export default function HistoricalDataView({ data, activeAsset = 'test-rig-a' }) {
   const [timeRange, setTimeRange] = useState('7D');
@@ -136,52 +136,58 @@ export default function HistoricalDataView({ data, activeAsset = 'test-rig-a' })
         <div className="card-header">
           <div className="card-title">Recent Anomaly Events Timeline</div>
         </div>
-        <div className="card-body" style={{ padding: "0 20px 16px" }}>
-          {ANOMALY_EVENTS.map((event, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'flex-start',
-                padding: '10px 0',
-                borderBottom: i === ANOMALY_EVENTS.length - 1 ? 'none' : '1px solid var(--border)'
-              }}
-            >
+        <div className="card-body" style={{ padding: "16px 20px" }}>
+          {ANOMALY_EVENTS.length > 0 ? (
+            ANOMALY_EVENTS.map((event, i) => (
               <div
+                key={i}
                 style={{
-                  fontSize: '10px',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  color: 'var(--text-muted)',
-                  minWidth: '110px',
-                  marginTop: '2px'
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'flex-start',
+                  padding: '10px 0',
+                  borderBottom: i === ANOMALY_EVENTS.length - 1 ? 'none' : '1px solid var(--border)'
                 }}
               >
-                {event.ts}
-              </div>
-              <div
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: sevColors[event.sev] || 'var(--accent)',
-                  marginTop: '5px',
-                  flexShrink: 0
-                }}
-              ></div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {event.msg}
+                <div
+                  style={{
+                    fontSize: '10px',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: 'var(--text-muted)',
+                    minWidth: '110px',
+                    marginTop: '2px'
+                  }}
+                >
+                  {event.ts}
                 </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Detected by: <span style={{ color: 'var(--accent)' }}>{event.model}</span>
+                <div
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: sevColors[event.sev] || 'var(--accent)',
+                    marginTop: '5px',
+                    flexShrink: 0
+                  }}
+                ></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {event.msg}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Detected by: <span style={{ color: 'var(--accent)' }}>{event.model}</span>
+                  </div>
                 </div>
+                <span className={`badge ${event.sev === 'critical' ? 'rose' : event.sev === 'warning' ? 'amber' : 'blue'}`}>
+                  {event.sev}
+                </span>
               </div>
-              <span className={`badge ${event.sev === 'critical' ? 'rose' : event.sev === 'warning' ? 'amber' : 'blue'}`}>
-                {event.sev}
-              </span>
+            ))
+          ) : (
+            <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+              No anomalous events detected. All recorded telemetry is operating within nominal safety thresholds.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </>

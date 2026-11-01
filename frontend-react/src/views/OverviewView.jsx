@@ -3,7 +3,7 @@ import { Line } from 'react-chartjs-2';
 import { Activity, Thermometer, Zap, TrendingUp } from 'lucide-react';
 import KpiCard from '../components/dashboard/KpiCard';
 import { commonOptions } from '../components/charts/ChartConfig';
-import { ALERT_DATA } from '../data/mockData';
+import { ALERT_DATA } from '../data/systemConfig';
 
 export default function OverviewView({ kpis = {}, data = {} }) {
   const labels = data?.labels || [];

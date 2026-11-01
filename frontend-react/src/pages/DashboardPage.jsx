@@ -59,13 +59,13 @@ export default function DashboardPage({ userRole, onLogout }) {
           <ErrorBoundary>
             {activeView === 'test-design' && userRole === 'admin' && <TestDesignView activeAsset={activeAsset} setActiveAsset={handleSelectAsset} />}
             {activeView === 'overview' && <OverviewView kpis={kpis} data={data} isConnected={isConnected} />}
-            {activeView === 'realtime' && <LiveTelemetryView data={data} isConnected={isConnected} />}
-            {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} />}
-            {activeView === 'ml-models' && <MlModelsView data={data} isConnected={isConnected} />}
-            {activeView === 'alerts' && <AlertsView />}
+            {activeView === 'realtime' && <LiveTelemetryView data={data} kpis={kpis} isConnected={isConnected} />}
+            {activeView === 'historical' && <HistoricalDataView data={data} activeAsset={activeAsset} isConnected={isConnected} />}
+            {activeView === 'ml-models' && <MlModelsView data={data} kpis={kpis} isConnected={isConnected} />}
+            {activeView === 'alerts' && <AlertsView data={data} kpis={kpis} isConnected={isConnected} />}
             {activeView === 'comparison' && <ComparisonView data={data} isConnected={isConnected} activeAsset={activeAsset} />}
-            {activeView === 'analysis' && <AnalysisView data={data} activeAsset={activeAsset} />}
-            {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} />}
+            {activeView === 'analysis' && <AnalysisView data={data} kpis={kpis} activeAsset={activeAsset} isConnected={isConnected} />}
+            {activeView === 'ai-assistant' && <AiAssistantView activeAsset={activeAsset} kpis={kpis} isConnected={isConnected} />}
           </ErrorBoundary>
         </main>
       </div>

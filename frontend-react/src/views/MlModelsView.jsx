@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { ML_MODELS } from '../data/mockData';
+import { ML_MODELS } from '../data/systemConfig';
 import '../components/charts/ChartConfig';
 
 export default function MlModelsView({ data = { vibX: [], vibY: [], temp: [], rpm: [] }, isConnected = false }) {

@@ -3,7 +3,7 @@ import { Line } from 'react-chartjs-2';
 import '../components/charts/ChartConfig';
 import { commonOptions } from '../components/charts/ChartConfig';
 
-function DialGauge({ value, min, max, unit, label, color, warnThreshold, critThreshold }) {
+function DialGauge({ value, min, max, unit, label, color, warnThreshold, critThreshold, decimals = 1 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -76,11 +76,15 @@ function DialGauge({ value, min, max, unit, label, color, warnThreshold, critThr
     valColor = 'var(--amber)';
   }
 
+  const formattedValue = typeof value === 'number'
+    ? (decimals === 0 ? Math.round(value) : value.toFixed(decimals))
+    : value;
+
   return (
     <div className="card gauge-wrap">
       <canvas ref={canvasRef} style={{ width: '180px', height: '110px', display: 'block' }} />
       <div className="gauge-value-display" style={{ color: valColor }}>
-        {typeof value === 'number' ? (Number.isInteger(value) ? value : value.toFixed(1)) : value}
+        {formattedValue}
       </div>
       <div className="gauge-unit-display">{unit}</div>
       <div className="gauge-label">{label}</div>
@@ -192,17 +196,25 @@ function FFTCanvas({ tickCount, isLive, lastVib = 0 }) {
   return <canvas ref={canvasRef} style={{ width: '100%', height: '140px', display: 'block' }} />;
 }
 
-export default function LiveTelemetryView({ data = {}, isConnected = false }) {
-  const vibX = data?.vibX || [];
-  const vibY = data?.vibY || [];
-  const temp = data?.temp || [];
-  const rpm = data?.rpm || [];
+export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = false }) {
+  const isLive = isConnected && (parseFloat(kpis?.vibRms || 0) > 0 || parseFloat(kpis?.temp || 0) > 0 || parseInt(kpis?.rpm || 0) > 0);
+
+  // When disconnected: all gauges strictly drop to zero
+  const lastVib = isLive ? (parseFloat(kpis?.vibRms) || 0) : 0;
+  const lastTemp = isLive ? (parseFloat(kpis?.temp) || 0) : 0;
+  const lastRpm = isLive ? (parseInt(kpis?.rpm) || 0) : 0;
+
+  const rawVibX = data?.vibX || [];
+  const rawVibY = data?.vibY || [];
+  const rawTemp = data?.temp || [];
+  const rawRpm = data?.rpm || [];
   const labels = data?.labels || [];
 
-  // Get latest values
-  const lastVib = vibX.length > 0 ? vibX[vibX.length - 1] : 0;
-  const lastTemp = temp.length > 0 ? temp[temp.length - 1] : 0;
-  const lastRpm = rpm.length > 0 ? rpm[rpm.length - 1] : 0;
+  // If disconnected, chart flatlines to zero
+  const vibX = isLive ? rawVibX : rawVibX.map(() => '0.00');
+  const vibY = isLive ? rawVibY : rawVibY.map(() => '0.00');
+  const temp = isLive ? rawTemp : rawTemp.map(() => '0.0');
+  const rpm = isLive ? rawRpm : rawRpm.map(() => 0);
 
   const combinedData = {
     labels: labels,
@@ -245,8 +257,12 @@ export default function LiveTelemetryView({ data = {}, isConnected = false }) {
   return (
     <>
       <div>
-        <div className="page-title">Real-Time Monitoring</div>
-        <div className="page-title-sub">Live sensor gauges updating every second</div>
+        <div className="page-title">
+          Real-Time Monitoring <span className={`badge ${isLive ? 'blue' : 'warn'}`} style={{fontSize:"11px", fontWeight:500}}>{isLive ? 'Live' : 'Standby (0 Telemetry)'}</span>
+        </div>
+        <div className="page-title-sub">
+          {isLive ? 'Live sensor gauges updating in real time' : 'Hardware Disconnected — All real-time telemetry at zero'}
+        </div>
       </div>
       
       <div className="grid-3" style={{ marginTop: "20px" }}>
@@ -254,6 +270,7 @@ export default function LiveTelemetryView({ data = {}, isConnected = false }) {
           value={lastVib}
           min={0}
           max={15}
+          decimals={2}
           unit="mm/s RMS"
           label="VIBRATION (Drive-End X)"
           color="#3b82f6"
@@ -263,8 +280,9 @@ export default function LiveTelemetryView({ data = {}, isConnected = false }) {
         
         <DialGauge
           value={lastTemp}
-          min={20}
+          min={0}
           max={100}
+          decimals={1}
           unit="°C"
           label="BEARING TEMPERATURE"
           color="#10b981"
@@ -276,6 +294,7 @@ export default function LiveTelemetryView({ data = {}, isConnected = false }) {
           value={lastRpm}
           min={0}
           max={3000}
+          decimals={0}
           unit="RPM"
           label="SHAFT SPEED"
           color="#f59e0b"
@@ -285,8 +304,9 @@ export default function LiveTelemetryView({ data = {}, isConnected = false }) {
       <div className="card" style={{ marginTop: "16px" }}>
         <div className="card-header">
           <div className="card-title">Real-Time Multi-Channel Feed</div>
-          <div style={{ fontSize: "12px", color: "var(--green)", display: "flex", alignItems: "center", gap: "6px" }}>
-            <div className="status-dot live"></div> Streaming at 1 Hz
+          <div style={{ fontSize: "12px", color: isLive ? "var(--green)" : "var(--amber)", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className={`status-dot ${isLive ? 'live' : 'warn'}`}></div> 
+            {isLive ? 'Streaming Live (2 Hz)' : 'Hardware Disconnected — Telemetry Flatline (0.00 mm/s)'}
           </div>
         </div>
         <div className="chart-wrap" style={{ height: "250px" }}>
@@ -303,14 +323,14 @@ export default function LiveTelemetryView({ data = {}, isConnected = false }) {
       <div className="card" style={{ marginTop: "16px" }}>
         <div className="card-header">
           <div className="card-title">Frequency Spectrum (FFT)</div>
-          <div className={`badge ${isConnected || parseFloat(lastVib || 0) > 0 ? 'blue' : 'warn'}`}>
-            {isConnected || parseFloat(lastVib || 0) > 0 ? 'Live' : 'Standby (0.00 mm/s)'}
+          <div className={`badge ${isLive ? 'blue' : 'warn'}`}>
+            {isLive ? 'Live' : 'Standby (0.00 mm/s)'}
           </div>
         </div>
         <div className="chart-wrap" style={{ height: "180px" }}>
           <FFTCanvas 
             tickCount={labels.length} 
-            isLive={isConnected || parseFloat(lastVib || 0) > 0} 
+            isLive={isLive} 
             lastVib={lastVib} 
           />
         </div>

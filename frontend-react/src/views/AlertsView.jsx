@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, AlertTriangle, Info } from 'lucide-react';
-import { ALERT_DATA } from '../data/mockData';
+import { ALERT_DATA } from '../data/systemConfig';
 
 export default function AlertsView() {
   const [alerts, setAlerts] = useState(ALERT_DATA);

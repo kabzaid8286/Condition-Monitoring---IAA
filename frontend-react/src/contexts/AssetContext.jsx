@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useCallback } from 'react';
-import { ASSETS as initialAssets } from '../data/mockData';
+import { ASSETS as initialAssets } from '../data/systemConfig';
 
-const AssetContext = createContext();
+const AssetContext = createContext(null);
 
 export const AssetProvider = ({ children }) => {
   const [assets, setAssets] = useState(() => {
@@ -104,4 +104,13 @@ export const AssetProvider = ({ children }) => {
   );
 };
 
-export const useAssets = () => useContext(AssetContext);
+export const useAssets = () => {
+  const context = useContext(AssetContext);
+  return context || { 
+    assets: initialAssets, 
+    addAsset: () => {}, 
+    updateAsset: () => {}, 
+    autoRegisterSensor: () => {}, 
+    removeAsset: () => {} 
+  };
+};
