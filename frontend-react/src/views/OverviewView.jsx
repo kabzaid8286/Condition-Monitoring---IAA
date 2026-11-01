@@ -5,22 +5,27 @@ import KpiCard from '../components/dashboard/KpiCard';
 import { commonOptions } from '../components/charts/ChartConfig';
 import { ALERT_DATA } from '../data/mockData';
 
-export default function OverviewView({ kpis, data }) {
-  const getSparklineData = (dataArray, color) => ({
-    labels: data.labels.slice(-20),
+export default function OverviewView({ kpis = {}, data = {} }) {
+  const labels = data?.labels || [];
+  const vibX = data?.vibX || [];
+  const temp = data?.temp || [];
+  const rpm = data?.rpm || [];
+
+  const getSparklineData = (dataArray = [], color) => ({
+    labels: labels.slice(-20),
     datasets: [{
-      data: dataArray.slice(-20),
+      data: (dataArray || []).slice(-20),
       borderColor: color,
       tension: 0.4
     }]
   });
 
   const mainChartData = {
-    labels: data.labels,
+    labels: labels,
     datasets: [
       {
         label: 'Vibration (mm/s)',
-        data: data.vibX,
+        data: vibX,
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
@@ -30,7 +35,7 @@ export default function OverviewView({ kpis, data }) {
       },
       {
         label: 'Temp (°C ×0.1)',
-        data: data.temp.map(t => (t * 0.1).toFixed(2)),
+        data: temp.map(t => (parseFloat(t || 0) * 0.1).toFixed(2)),
         borderColor: '#10b981',
         borderWidth: 2,
         tension: 0.4,
@@ -48,10 +53,10 @@ export default function OverviewView({ kpis, data }) {
       <div className="page-title-sub">Main system status and health</div>
       
       <div className="overview-grid" style={{marginTop:"20px"}}>
-         <KpiCard title="Vibration RMS" value={kpis.vibRms} unit="mm/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(data.vibX, '#3b82f6')} trend="↑ +0.18 from last hour" trendClass="up" />
-         <KpiCard title="Bearing Temp" value={kpis.temp} unit="°C" colorClass="green" icon={<Thermometer size={18} color="#10b981" />} chartData={getSparklineData(data.temp, '#10b981')} trend="→ Stable for 14 min" trendClass="neutral" />
-         <KpiCard title="Shaft Speed" value={kpis.rpm} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(data.rpm, '#f59e0b')} trend="→ Within setpoint ±5" trendClass="neutral" />
-         <KpiCard title="Anomaly Score" value={(parseFloat(kpis.vibRms || 0) / 10).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(data.vibX.map(v => parseFloat(v || 0)/10), '#f43f5e')} trend="↓ Low risk" trendClass="down" />
+         <KpiCard title="Vibration RMS" value={kpis?.vibRms ?? '0.00'} unit="mm/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(vibX, '#3b82f6')} trend="↑ +0.18 from last hour" trendClass="up" />
+         <KpiCard title="Bearing Temp" value={kpis?.temp ?? '0.0'} unit="°C" colorClass="green" icon={<Thermometer size={18} color="#10b981" />} chartData={getSparklineData(temp, '#10b981')} trend="→ Stable for 14 min" trendClass="neutral" />
+         <KpiCard title="Shaft Speed" value={kpis?.rpm ?? 0} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(rpm, '#f59e0b')} trend="→ Within setpoint ±5" trendClass="neutral" />
+         <KpiCard title="Anomaly Score" value={(parseFloat(kpis?.vibRms || 0) / 10).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(vibX.map(v => parseFloat(v || 0)/10), '#f43f5e')} trend="↓ Low risk" trendClass="down" />
       </div>
 
       <div className="chart-row" style={{marginTop: "16px"}}>

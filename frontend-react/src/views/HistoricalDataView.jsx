@@ -30,10 +30,10 @@ export default function HistoricalDataView({ data, activeAsset = 'test-rig-a' })
     return () => { isCancelled = true; };
   }, [activeAsset, timeRange]);
 
-  const labels = histData ? histData.labels : data.labels;
-  const vibValues = histData ? histData.vibX : data.vibX.map(v => (v * 1.5).toFixed(2));
-  const tempValues = histData ? histData.temp : data.temp.map(v => (v * 1.1).toFixed(2));
-  const rpmValues = histData ? histData.rpm : data.rpm.map(v => (v * 0.95).toFixed(0));
+  const labels = histData?.labels || data?.labels || [];
+  const vibValues = histData?.vibX || (data?.vibX || []).map(v => (parseFloat(v || 0) * 1.5).toFixed(2));
+  const tempValues = histData?.temp || (data?.temp || []).map(v => (parseFloat(v || 0) * 1.1).toFixed(2));
+  const rpmValues = histData?.rpm || (data?.rpm || []).map(v => (parseFloat(v || 0) * 0.95).toFixed(0));
 
   const histVibData = {
     labels: labels,
