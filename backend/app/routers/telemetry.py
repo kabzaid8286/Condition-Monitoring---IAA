@@ -24,6 +24,14 @@ async def get_telemetry_snapshot() -> Dict[str, Any]:
     """Get the current latest reading across all machines"""
     return hub.latest_readings
 
+@router.delete("/snapshot/{asset_id}")
+async def delete_telemetry_snapshot(asset_id: str):
+    """Remove an asset from the latest readings snapshot cache"""
+    if asset_id in hub.latest_readings and asset_id != "test-rig-a":
+        del hub.latest_readings[asset_id]
+        return {"status": "deleted", "asset_id": asset_id}
+    return {"status": "not_found", "asset_id": asset_id}
+
 @router.get("/live/{asset_id}")
 async def get_live_asset_telemetry(asset_id: str) -> Dict[str, Any]:
     """Get the latest sensor reading for a specific machine"""

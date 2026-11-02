@@ -141,9 +141,13 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
 
             // 1. Process SNAPSHOT
             if (payload.type === 'SNAPSHOT' && payload.data) {
-              Object.keys(payload.data).forEach(id => {
-                if (autoRegisterSensor) {
-                  autoRegisterSensor(id);
+              const now = Date.now();
+              Object.entries(payload.data).forEach(([id, item]) => {
+                // Only auto-register from snapshot if the reading is actively live (<3.5s old)
+                const packetTime = item.time ? new Date(item.time).getTime() : 0;
+                const isActivelyStreaming = (now - packetTime) <= 3500;
+                if (isActivelyStreaming && autoRegisterSensor) {
+                  autoRegisterSensor(id, item.name || item.asset_name, false);
                 }
               });
             } 
@@ -154,9 +158,9 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
 
               if (!incomingId) return;
 
-              // Auto-detect new sensor if not yet registered in system design
+              // Auto-detect new sensor if not yet registered in system design (live hardware wake-up)
               if (autoRegisterSensor) {
-                autoRegisterSensor(incomingId, item.name || item.asset_name);
+                autoRegisterSensor(incomingId, item.name || item.asset_name, true);
               }
 
               // Update last packet timestamp for THIS specific sensor
