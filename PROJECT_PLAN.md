@@ -39,8 +39,8 @@
 
 ## Phase 5: Wireless Bluetooth (BLE) & Raspberry Pi 5 Gateway Deployment (Current Milestone)
 *Goal: Enable wireless telemetry transmission over Bluetooth Low Energy (BLE) and move gateway daemon to the Raspberry Pi 5.*
-- [ ] **Firmware Dual-Mode (BLE + USB)**: Enable Nordic UART Service (NUS) in `xiao_condition_node.ino` for cable-free coin-cell telemetry transmission.
-- [ ] **Gateway BLE Ingestion**: Implement asynchronous Bluetooth LE scanner/receiver in `gateway/rpi_publisher.py` (via `bleak`) to ingest wireless telemetry on macOS and Linux (RPi 5).
+- [x] **Firmware Dual-Mode (BLE + USB)**: Integrated Nordic UART Service (NUS) with `Bluefruit52Lib` in `xiao_condition_node.ino` for cable-free telemetry transmission.
+- [x] **Gateway BLE Ingestion**: Implemented asynchronous Bluetooth LE scanner/receiver in `gateway/rpi_publisher.py` (via `bleak`), verified live wireless reception (`[BLE-WIRELESS]`) and MQTT forwarding.
 - [ ] **Transfer to Raspberry Pi 5**: Transfer `gateway/` and dependencies to Raspberry Pi 5 OS (Debian Bookworm).
 - [ ] **Systemd Headless Daemon**: Configure `condition-monitor-gateway.service` for automatic boot recovery and background execution.
 - [ ] **LAN/Wi-Fi MQTT Routing**: Route wireless MQTT traffic from the Raspberry Pi 5 to the central server/broker.
