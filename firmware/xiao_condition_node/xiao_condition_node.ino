@@ -152,6 +152,23 @@ void readVibration(float &vibX, float &vibY) {
 // SYSTEM ENTRY & BURST EXECUTION
 // ==========================================
 
+static void emitTelemetry(Print &out, const char* assetId, const char* assetName, float vx, float vy, float temp, int battery) {
+  out.print("{\"asset_id\":\"");
+  out.print(assetId);
+  out.print("\",\"name\":\"");
+  out.print(assetName);
+  out.print("\",\"vibration_x\":");
+  out.print(vx, 3);
+  out.print(",\"vibration_y\":");
+  out.print(vy, 3);
+  out.print(",\"temperature\":");
+  out.print(temp, 2);
+  out.print(",\"rpm\":1480");
+  out.print(",\"battery_pct\":");
+  out.print(battery);
+  out.print(",\"burst_state\":\"active\"}\n");
+}
+
 void setup() {
   Serial.begin(BAUD_RATE);
 
@@ -195,6 +212,8 @@ void setup() {
   Serial.print(effectiveAssetId);
   Serial.println("). Starting burst acquisition...\"}");
 
+
+
   // Execute the 10-second high-frequency burst
   unsigned long burstStartTime = millis();
   unsigned long lastSampleTime = 0;
@@ -211,19 +230,14 @@ void setup() {
       float temp = readTemperatureProbe();
       int batteryPct = readBatteryPercentage();
 
-      char payloadBuf[256];
-      snprintf(payloadBuf, sizeof(payloadBuf),
-        "{\"asset_id\":\"%s\",\"name\":\"%s\",\"vibration_x\":%.3f,\"vibration_y\":%.3f,\"temperature\":%.2f,\"rpm\":1480,\"battery_pct\":%d,\"burst_state\":\"active\"}\n",
-        effectiveAssetId, effectiveAssetName, vibX, vibY, temp, batteryPct);
-
       // 1. Output to USB Serial (Cable)
-      Serial.print(payloadBuf);
+      emitTelemetry(Serial, effectiveAssetId, effectiveAssetName, vibX, vibY, temp, batteryPct);
       Serial.flush();
 
       // 2. Output to Bluetooth LE (Nordic UART Service Wireless)
 #if HAS_BLE
       if (bleuart.notifyEnabled()) {
-        bleuart.print(payloadBuf);
+        emitTelemetry(bleuart, effectiveAssetId, effectiveAssetName, vibX, vibY, temp, batteryPct);
       }
 #endif
     }
