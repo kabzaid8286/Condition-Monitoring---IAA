@@ -164,88 +164,99 @@ async def run_ble_mode(mqtt_client, args):
     """
     from bleak import BleakScanner, BleakClient
 
-    print("📡 [BLE Gateway] Starting Bluetooth LE wireless receiver...")
+    print("📡 [BLE Gateway] Starting Bluetooth LE multi-node wireless receiver...")
     print(f"Targeting devices advertising 'IAA-*' or Nordic UART Service ({NUS_SERVICE_UUID})")
 
-    line_buffer = ""
+    connected_addresses = set()
 
-    def handle_rx(_: int, data: bytearray):
-        nonlocal line_buffer
-        text = data.decode("utf-8", errors="replace")
-        line_buffer += text
-        while "\n" in line_buffer:
-            line, line_buffer = line_buffer.split("\n", 1)
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("{") and line.endswith("}"):
-                try:
-                    payload_json = json.loads(line)
-                    if payload_json.get("burst_state") == "sleep":
-                        print("💤 [BLE] Sensor entering low-power sleep for duty cycle.")
-                        continue
+    async def handle_device_connection(device):
+        address = device.address
+        name = device.name or "IAA-Sensor"
+        connected_addresses.add(address)
+        line_buffer = ""
 
-                    asset_id = str(payload_json.get("asset_id") or payload_json.get("id") or args.asset).strip()
-                    asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
-                    readings = {
-                        "vibration_x": float(payload_json.get("vibration_x") if payload_json.get("vibration_x") is not None else payload_json.get("vx", payload_json.get("vib_x", 0.0))),
-                        "vibration_y": float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0))),
-                        "temperature": float(payload_json.get("temperature") if payload_json.get("temperature") is not None else payload_json.get("temp", payload_json.get("t", 0.0))),
-                        "rpm": float(payload_json.get("rpm", 1480.0)),
-                        "battery_pct": int(payload_json.get("battery_pct") if payload_json.get("battery_pct") is not None else payload_json.get("bat", payload_json.get("b", 100))),
-                        "burst_state": str(payload_json.get("burst_state", "active"))
-                    }
+        def handle_rx(_: int, data: bytearray):
+            nonlocal line_buffer
+            text = data.decode("utf-8", errors="replace")
+            line_buffer += text
+            while "\n" in line_buffer:
+                line, line_buffer = line_buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("{") and line.endswith("}"):
+                    try:
+                        payload_json = json.loads(line)
+                        if payload_json.get("burst_state") == "sleep":
+                            print(f"💤 [BLE] {name} entering low-power sleep for duty cycle.")
+                            continue
 
-                    topic = f"sensors/{asset_id}/telemetry"
-                    msg = {
-                        "asset_id": asset_id,
-                        "asset_name": asset_name,
-                        "name": asset_name,
-                        "gateway_id": args.gateway_id,
-                        "transport": "ble",
-                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        "sensors": readings,
-                        "quality": 100
-                    }
-                    mqtt_client.publish(topic, json.dumps(msg), qos=0)
-                    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BLE-WIRELESS] [{asset_id} ({asset_name})] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}%")
-                except Exception as err:
-                    print(f"[BLE-WARN] Incomplete JSON packet ({err}): {line}")
-            else:
-                print(f"[BLE LOG] {line}")
+                        asset_id = str(payload_json.get("asset_id") or payload_json.get("id") or args.asset).strip()
+                        asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
+                        readings = {
+                            "vibration_x": float(payload_json.get("vibration_x") if payload_json.get("vibration_x") is not None else payload_json.get("vx", payload_json.get("vib_x", 0.0))),
+                            "vibration_y": float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0))),
+                            "temperature": float(payload_json.get("temperature") if payload_json.get("temperature") is not None else payload_json.get("temp", payload_json.get("t", 0.0))),
+                            "rpm": float(payload_json.get("rpm", 1480.0)),
+                            "battery_pct": int(payload_json.get("battery_pct") if payload_json.get("battery_pct") is not None else payload_json.get("bat", payload_json.get("b", 100))),
+                            "burst_state": str(payload_json.get("burst_state", "active"))
+                        }
 
-    while True:
+                        topic = f"sensors/{asset_id}/telemetry"
+                        msg = {
+                            "asset_id": asset_id,
+                            "asset_name": asset_name,
+                            "name": asset_name,
+                            "gateway_id": args.gateway_id,
+                            "transport": "ble",
+                            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "sensors": readings,
+                            "quality": 100
+                        }
+                        mqtt_client.publish(topic, json.dumps(msg), qos=0)
+                        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BLE-WIRELESS] [{asset_id} ({asset_name})] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}%")
+                    except Exception as err:
+                        print(f"[BLE-WARN] Incomplete JSON packet ({err}): {line}")
+                else:
+                    print(f"[BLE LOG] {line}")
+
         try:
-            print("🔍 [BLE] Scanning for nearby Seeed Studio XIAO nodes...")
-            devices = await BleakScanner.discover(timeout=5.0, return_adv=True)
-            target_device = None
-            for d, adv in devices.values():
-                name = d.name or adv.local_name or ""
-                uuids = [u.lower() for u in (adv.service_uuids or [])]
-                if name.startswith("IAA-") or NUS_SERVICE_UUID in uuids:
-                    target_device = d
-                    print(f"🎯 [BLE] Discovered wireless sensor: '{name}' ({d.address}) RSSI: {adv.rssi} dBm")
-                    break
-
-            if not target_device:
-                print("⏳ [BLE] No XIAO node in advertising range. Retrying scan in 3s...")
-                await asyncio.sleep(3)
-                continue
-
-            print(f"🔗 [BLE] Connecting wirelessly to {target_device.name or target_device.address}...")
-            async with BleakClient(target_device.address) as client:
-                print(f"✅ [BLE] Connected wirelessly to {target_device.name}!")
+            print(f"🔗 [BLE] Connecting wirelessly to {name} ({address})...")
+            async with BleakClient(address) as client:
+                print(f"✅ [BLE] Connected wirelessly to {name}!")
                 await client.start_notify(NUS_TX_CHAR_UUID, handle_rx)
-                print("📥 [BLE] Subscribed to Nordic UART stream. Streaming live wireless telemetry to MQTT...")
+                print(f"📥 [BLE] Subscribed to {name} Nordic UART stream. Streaming live...")
 
                 while client.is_connected:
                     await asyncio.sleep(1)
 
-            print("⚠️ [BLE] Disconnected from wireless node. Rescanning...")
+            print(f"⚠️ [BLE] Disconnected from wireless node {name}.")
+        except Exception as e:
+            print(f"[BLE-ERR] Connection error on {name}: {e}")
+        finally:
+            connected_addresses.discard(address)
+
+    tasks = set()
+    while True:
+        try:
+            # Clean up finished tasks
+            tasks = {t for t in tasks if not t.done()}
+
+            # Scan for advertising sensor nodes not yet connected
+            devices = await BleakScanner.discover(timeout=4.0, return_adv=True)
+            for d, adv in devices.values():
+                name = d.name or adv.local_name or ""
+                uuids = [u.lower() for u in (adv.service_uuids or [])]
+                if (name.startswith("IAA-") or NUS_SERVICE_UUID in uuids) and d.address not in connected_addresses:
+                    print(f"🎯 [BLE] Discovered new wireless sensor: '{name}' ({d.address}) RSSI: {adv.rssi} dBm")
+                    task = asyncio.create_task(handle_device_connection(d))
+                    tasks.add(task)
+
+            await asyncio.sleep(2)
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"[BLE-ERR] Communication error: {e}. Retrying in 3s...")
+            print(f"[BLE-SCAN-ERR] Scan loop error: {e}. Retrying in 3s...")
             await asyncio.sleep(3)
 
 
