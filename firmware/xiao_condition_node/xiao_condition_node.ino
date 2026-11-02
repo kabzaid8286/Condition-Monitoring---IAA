@@ -152,133 +152,120 @@ void readVibration(float &vibX, float &vibY) {
 // SYSTEM ENTRY & BURST EXECUTION
 // ==========================================
 
-static void emitTelemetry(Print &out, const char* assetId, const char* assetName, float vx, float vy, float temp, int battery) {
-  out.print("{\"asset_id\":\"");
-  out.print(assetId);
-  out.print("\",\"name\":\"");
-  out.print(assetName);
-  out.print("\",\"vibration_x\":");
-  out.print(vx, 3);
-  out.print(",\"vibration_y\":");
-  out.print(vy, 3);
-  out.print(",\"temperature\":");
-  out.print(temp, 2);
-  out.print(",\"rpm\":1480");
-  out.print(",\"battery_pct\":");
-  out.print(battery);
-  out.print(",\"burst_state\":\"active\"}\n");
+static void formatFloat(char* dest, size_t destSize, float val, int decimals) {
+  int intPart = (int)val;
+  float diff = val - (float)intPart;
+  if (diff < 0.0f) diff = -diff;
+  int multiplier = 1;
+  for (int i = 0; i < decimals; i++) multiplier *= 10;
+  int fracPart = (int)(diff * multiplier + 0.5f);
+  snprintf(dest, destSize, "%d.%0*d", intPart, decimals, fracPart);
 }
+
+static void emitTelemetryPayload(const char* assetId, const char* assetName, float vx, float vy, float temp, int battery) {
+  char strVx[12], strVy[12], strTemp[12];
+  formatFloat(strVx, sizeof(strVx), vx, 2);
+  formatFloat(strVy, sizeof(strVy), vy, 2);
+  formatFloat(strTemp, sizeof(strTemp), temp, 1);
+
+  char buf[128];
+  int n = snprintf(buf, sizeof(buf),
+    "{\"id\":\"%s\",\"name\":\"%s\",\"vx\":%s,\"vy\":%s,\"t\":%s,\"rpm\":1480,\"bat\":%d}\n",
+    assetId, assetName, strVx, strVy, strTemp, battery);
+
+  if (n <= 0) return;
+
+  // 1. Output to USB Serial if physical USB cable is connected
+  if (Serial) {
+    Serial.write((const uint8_t*)buf, (size_t)n);
+  }
+
+  // 2. Output to Bluetooth LE if central connected and subscribed
+#if HAS_BLE
+  if (Bluefruit.connected() && bleuart.notifyEnabled()) {
+    bleuart.write((const uint8_t*)buf, (size_t)n);
+    bleuart.flushTXD();
+  }
+#endif
+}
+
+static const char* g_effectiveAssetId = ASSET_ID;
+static const char* g_effectiveAssetName = ASSET_NAME;
+
+#if HAS_BLE
+void connectCallback(uint16_t conn_handle) {
+  if (Serial) Serial.println("{\"log\":\"[BLE] Central connected!\"}");
+}
+
+void disconnectCallback(uint16_t conn_handle, uint8_t reason) {
+  if (Serial) {
+    Serial.print("{\"log\":\"[BLE] Central disconnected, reason=0x");
+    Serial.print(reason, HEX);
+    Serial.println("\"}");
+  }
+}
+#endif
 
 void setup() {
   Serial.begin(BAUD_RATE);
 
-  // Wait up to 2 seconds for USB CDC Serial if plugged into computer
-  unsigned long startWait = millis();
-  while (!Serial && (millis() - startWait < 2000)) {
-    delay(10);
+  // Resolve dynamic unique identity once at startup
+  if (strcmp(g_effectiveAssetId, "auto") == 0 || strlen(g_effectiveAssetId) == 0) {
+    g_effectiveAssetId = getUniqueBoardId();
   }
-
-  // Resolve dynamic unique identity
-  const char* effectiveAssetId = ASSET_ID;
-  const char* effectiveAssetName = ASSET_NAME;
-
-  if (strcmp(effectiveAssetId, "auto") == 0 || strlen(effectiveAssetId) == 0) {
-    effectiveAssetId = getUniqueBoardId();
-  }
-  if (strcmp(effectiveAssetName, "auto") == 0 || strlen(effectiveAssetName) == 0) {
-    effectiveAssetName = getBoardFriendlyName(effectiveAssetId);
+  if (strcmp(g_effectiveAssetName, "auto") == 0 || strlen(g_effectiveAssetName) == 0) {
+    g_effectiveAssetName = getBoardFriendlyName(g_effectiveAssetId);
   }
 
 #if HAS_BLE
-  if (!s_bleStarted) {
-    Bluefruit.begin();
-    char bleAdvName[32];
-    snprintf(bleAdvName, sizeof(bleAdvName), "IAA-%s", effectiveAssetId);
-    Bluefruit.setName(bleAdvName);
-    bleuart.begin();
-    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-    Bluefruit.Advertising.addService(bleuart);
-    Bluefruit.Advertising.addName();
-    Bluefruit.Advertising.restartOnDisconnect(true);
-    Bluefruit.Advertising.setInterval(32, 244);
-    Bluefruit.Advertising.start(0);
-    s_bleStarted = true;
+  Bluefruit.begin();
+  char bleAdvName[32];
+  snprintf(bleAdvName, sizeof(bleAdvName), "IAA-%s", g_effectiveAssetId);
+  Bluefruit.setName(bleAdvName);
+  Bluefruit.setTxPower(0);
+  Bluefruit.Periph.setConnectCallback(connectCallback);
+  Bluefruit.Periph.setDisconnectCallback(disconnectCallback);
+  Bluefruit.Periph.setConnIntervalMS(20, 40);
+  Bluefruit.Periph.setConnSlaveLatency(0);
+  Bluefruit.Periph.setConnSupervisionTimeoutMS(4000);
+  bleuart.begin();
+
+  Bluefruit.Advertising.clearData();
+  Bluefruit.ScanResponse.clearData();
+  Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+  Bluefruit.Advertising.addService(bleuart);
+  Bluefruit.Advertising.addName();
+  Bluefruit.ScanResponse.addName();
+  Bluefruit.Advertising.restartOnDisconnect(true);
+  Bluefruit.Advertising.setInterval(32, 244);
+  Bluefruit.Advertising.start(0);
+#endif
+
+  if (Serial) {
+    Serial.print("{\"log\":\"[XIAO] Online as ");
+    Serial.print(g_effectiveAssetName);
+    Serial.print(" (ID: ");
+    Serial.print(g_effectiveAssetId);
+    Serial.println("). Starting continuous telemetry...\"}");
   }
-#endif
-
-  Serial.print("{\"log\":\"[XIAO] Online as ");
-  Serial.print(effectiveAssetName);
-  Serial.print(" (ID: ");
-  Serial.print(effectiveAssetId);
-  Serial.println("). Starting burst acquisition...\"}");
-
-
-
-  // Execute the 10-second high-frequency burst
-  unsigned long burstStartTime = millis();
-  unsigned long lastSampleTime = 0;
-
-  while (millis() - burstStartTime < BURST_DURATION_MS) {
-    unsigned long currentMillis = millis();
-
-    if (currentMillis - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-      lastSampleTime = currentMillis;
-
-      float vibX = 0.0f;
-      float vibY = 0.0f;
-      readVibration(vibX, vibY);
-      float temp = readTemperatureProbe();
-      int batteryPct = readBatteryPercentage();
-
-      // 1. Output to USB Serial (Cable)
-      emitTelemetry(Serial, effectiveAssetId, effectiveAssetName, vibX, vibY, temp, batteryPct);
-      Serial.flush();
-
-      // 2. Output to Bluetooth LE (Nordic UART Service Wireless)
-#if HAS_BLE
-      if (bleuart.notifyEnabled()) {
-        emitTelemetry(bleuart, effectiveAssetId, effectiveAssetName, vibX, vibY, temp, batteryPct);
-      }
-#endif
-    }
-
-    delay(20);
-  }
-
-  // Announce transition to low-power deep sleep
-  Serial.print("{\"burst_state\":\"sleep\",\"sleep_seconds\":");
-  Serial.print((unsigned long)SLEEP_DURATION_SEC);
-  Serial.println(",\"log\":\"Entering Deep Sleep to preserve battery...\"}");
-  Serial.flush();
-#if HAS_BLE
-  if (bleuart.notifyEnabled()) {
-    bleuart.print("{\"burst_state\":\"sleep\"}\n");
-  }
-#endif
-  delay(100);
-
-// ==========================================
-// ENTER HARDWARE DEEP SLEEP
-// ==========================================
-#if defined(ESP32)
-  // ESP32-C3 / ESP32-S3 Deep Sleep API (current drops to ~5-15 µA)
-  esp_sleep_enable_timer_wakeup(SLEEP_DURATION_SEC * 1000000ULL);
-  esp_deep_sleep_start();
-#elif defined(ARDUINO_ARCH_RP2040)
-  // RP2040 low-power sleep
-  delay((unsigned long)SLEEP_DURATION_SEC * 1000UL);
-  setup(); // restart cycle
-#elif defined(ARDUINO_ARCH_SAMD)
-  // SAMD21 Standby sleep
-  delay((unsigned long)SLEEP_DURATION_SEC * 1000UL);
-  setup();
-#else
-  // Standard fallback delay
-  delay((unsigned long)SLEEP_DURATION_SEC * 1000UL);
-  setup();
-#endif
 }
 
+static unsigned long lastSampleTime = 0;
+
 void loop() {
-  // Empty - All execution occurs in setup() before entering Deep Sleep
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+    lastSampleTime = currentMillis;
+
+    float vibX = 0.0f;
+    float vibY = 0.0f;
+    readVibration(vibX, vibY);
+    float temp = readTemperatureProbe();
+    int batteryPct = readBatteryPercentage();
+
+    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, temp, batteryPct);
+  }
+
+  yield();
 }

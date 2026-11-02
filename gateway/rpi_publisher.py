@@ -185,14 +185,14 @@ async def run_ble_mode(mqtt_client, args):
                         print("💤 [BLE] Sensor entering low-power sleep for duty cycle.")
                         continue
 
-                    asset_id = str(payload_json.get("asset_id") or args.asset).strip()
+                    asset_id = str(payload_json.get("asset_id") or payload_json.get("id") or args.asset).strip()
                     asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
                     readings = {
-                        "vibration_x": float(payload_json.get("vibration_x", 0.0)),
-                        "vibration_y": float(payload_json.get("vibration_y", 0.0)),
-                        "temperature": float(payload_json.get("temperature", 0.0)),
+                        "vibration_x": float(payload_json.get("vibration_x") if payload_json.get("vibration_x") is not None else payload_json.get("vx", payload_json.get("vib_x", 0.0))),
+                        "vibration_y": float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0))),
+                        "temperature": float(payload_json.get("temperature") if payload_json.get("temperature") is not None else payload_json.get("temp", payload_json.get("t", 0.0))),
                         "rpm": float(payload_json.get("rpm", 1480.0)),
-                        "battery_pct": int(payload_json.get("battery_pct", 100)),
+                        "battery_pct": int(payload_json.get("battery_pct") if payload_json.get("battery_pct") is not None else payload_json.get("bat", payload_json.get("b", 100))),
                         "burst_state": str(payload_json.get("burst_state", "active"))
                     }
 
