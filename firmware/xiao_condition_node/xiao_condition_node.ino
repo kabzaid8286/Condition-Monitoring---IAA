@@ -41,6 +41,17 @@
 
 #if defined(ARDUINO_ARCH_NRF54L15CLEAN)
 #include <nrf54l15_hal_ficr.h>
+#define HAS_BLE 1
+#include <bluefruit.h>
+static BLEUart bleuart;
+static bool s_bleStarted = false;
+#elif defined(NRF52_SERIES)
+#define HAS_BLE 1
+#include <bluefruit.h>
+static BLEUart bleuart;
+static bool s_bleStarted = false;
+#else
+#define HAS_BLE 0
 #endif
 
 // ==========================================
@@ -161,6 +172,23 @@ void setup() {
     effectiveAssetName = getBoardFriendlyName(effectiveAssetId);
   }
 
+#if HAS_BLE
+  if (!s_bleStarted) {
+    Bluefruit.begin();
+    char bleAdvName[32];
+    snprintf(bleAdvName, sizeof(bleAdvName), "IAA-%s", effectiveAssetId);
+    Bluefruit.setName(bleAdvName);
+    bleuart.begin();
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addService(bleuart);
+    Bluefruit.Advertising.addName();
+    Bluefruit.Advertising.restartOnDisconnect(true);
+    Bluefruit.Advertising.setInterval(32, 244);
+    Bluefruit.Advertising.start(0);
+    s_bleStarted = true;
+  }
+#endif
+
   Serial.print("{\"log\":\"[XIAO] Online as ");
   Serial.print(effectiveAssetName);
   Serial.print(" (ID: ");
@@ -183,22 +211,21 @@ void setup() {
       float temp = readTemperatureProbe();
       int batteryPct = readBatteryPercentage();
 
-      // Output JSON line to USB Serial with unique asset_id and friendly name
-      Serial.print("{\"asset_id\":\"");
-      Serial.print(effectiveAssetId);
-      Serial.print("\",\"name\":\"");
-      Serial.print(effectiveAssetName);
-      Serial.print("\",\"vibration_x\":");
-      Serial.print(vibX, 3);
-      Serial.print(",\"vibration_y\":");
-      Serial.print(vibY, 3);
-      Serial.print(",\"temperature\":");
-      Serial.print(temp, 2);
-      Serial.print(",\"rpm\":1480");
-      Serial.print(",\"battery_pct\":");
-      Serial.print(batteryPct);
-      Serial.print(",\"burst_state\":\"active\"}\n");
+      char payloadBuf[256];
+      snprintf(payloadBuf, sizeof(payloadBuf),
+        "{\"asset_id\":\"%s\",\"name\":\"%s\",\"vibration_x\":%.3f,\"vibration_y\":%.3f,\"temperature\":%.2f,\"rpm\":1480,\"battery_pct\":%d,\"burst_state\":\"active\"}\n",
+        effectiveAssetId, effectiveAssetName, vibX, vibY, temp, batteryPct);
+
+      // 1. Output to USB Serial (Cable)
+      Serial.print(payloadBuf);
       Serial.flush();
+
+      // 2. Output to Bluetooth LE (Nordic UART Service Wireless)
+#if HAS_BLE
+      if (bleuart.notifyEnabled()) {
+        bleuart.print(payloadBuf);
+      }
+#endif
     }
 
     delay(20);
@@ -209,6 +236,11 @@ void setup() {
   Serial.print((unsigned long)SLEEP_DURATION_SEC);
   Serial.println(",\"log\":\"Entering Deep Sleep to preserve battery...\"}");
   Serial.flush();
+#if HAS_BLE
+  if (bleuart.notifyEnabled()) {
+    bleuart.print("{\"burst_state\":\"sleep\"}\n");
+  }
+#endif
   delay(100);
 
 // ==========================================

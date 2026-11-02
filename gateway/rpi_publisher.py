@@ -6,7 +6,8 @@ Condition Monitoring App — IAA / HS Aalen
 Publishes real-time high-frequency sensor telemetry to the Eclipse Mosquitto MQTT broker.
 Supports:
   1. Serial USB Mode (Seeed Studio XIAO with Vibration + Temp Probe + Coin-Cell Battery)
-  2. Mathematical Simulation Mode (Offline / Testing fallback)
+  2. Bluetooth Low Energy (BLE) Wireless Mode (Seeed Studio XIAO over Nordic UART Service)
+  3. Mathematical Simulation Mode (Offline / Testing fallback)
 """
 
 import time
@@ -16,7 +17,12 @@ import math
 import argparse
 import datetime
 import glob
+import asyncio
 import paho.mqtt.client as mqtt
+
+# Nordic UART Service (NUS) UUIDs
+NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+NUS_TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
 # Default Configuration
 DEFAULT_BROKER_HOST = "localhost"
@@ -150,13 +156,106 @@ class SensorReader:
         }
 
 
+async def run_ble_mode(mqtt_client, args):
+    """
+    Asynchronous Bluetooth Low Energy (BLE) ingestion loop.
+    Scans for nearby Seeed Studio XIAO sensor nodes advertising Nordic UART Service (NUS),
+    connects wirelessly, and publishes live telemetry packets to Mosquitto MQTT.
+    """
+    from bleak import BleakScanner, BleakClient
+
+    print("📡 [BLE Gateway] Starting Bluetooth LE wireless receiver...")
+    print(f"Targeting devices advertising 'IAA-*' or Nordic UART Service ({NUS_SERVICE_UUID})")
+
+    line_buffer = ""
+
+    def handle_rx(_: int, data: bytearray):
+        nonlocal line_buffer
+        text = data.decode("utf-8", errors="replace")
+        line_buffer += text
+        while "\n" in line_buffer:
+            line, line_buffer = line_buffer.split("\n", 1)
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("{") and line.endswith("}"):
+                try:
+                    payload_json = json.loads(line)
+                    if payload_json.get("burst_state") == "sleep":
+                        print("💤 [BLE] Sensor entering low-power sleep for duty cycle.")
+                        continue
+
+                    asset_id = str(payload_json.get("asset_id") or args.asset).strip()
+                    asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
+                    readings = {
+                        "vibration_x": float(payload_json.get("vibration_x", 0.0)),
+                        "vibration_y": float(payload_json.get("vibration_y", 0.0)),
+                        "temperature": float(payload_json.get("temperature", 0.0)),
+                        "rpm": float(payload_json.get("rpm", 1480.0)),
+                        "battery_pct": int(payload_json.get("battery_pct", 100)),
+                        "burst_state": str(payload_json.get("burst_state", "active"))
+                    }
+
+                    topic = f"sensors/{asset_id}/telemetry"
+                    msg = {
+                        "asset_id": asset_id,
+                        "asset_name": asset_name,
+                        "name": asset_name,
+                        "gateway_id": args.gateway_id,
+                        "transport": "ble",
+                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "sensors": readings,
+                        "quality": 100
+                    }
+                    mqtt_client.publish(topic, json.dumps(msg), qos=0)
+                    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BLE-WIRELESS] [{asset_id} ({asset_name})] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}%")
+                except Exception as err:
+                    print(f"[BLE-WARN] Incomplete JSON packet ({err}): {line}")
+            else:
+                print(f"[BLE LOG] {line}")
+
+    while True:
+        try:
+            print("🔍 [BLE] Scanning for nearby Seeed Studio XIAO nodes...")
+            devices = await BleakScanner.discover(timeout=5.0, return_adv=True)
+            target_device = None
+            for d, adv in devices.values():
+                name = d.name or adv.local_name or ""
+                uuids = [u.lower() for u in (adv.service_uuids or [])]
+                if name.startswith("IAA-") or NUS_SERVICE_UUID in uuids:
+                    target_device = d
+                    print(f"🎯 [BLE] Discovered wireless sensor: '{name}' ({d.address}) RSSI: {adv.rssi} dBm")
+                    break
+
+            if not target_device:
+                print("⏳ [BLE] No XIAO node in advertising range. Retrying scan in 3s...")
+                await asyncio.sleep(3)
+                continue
+
+            print(f"🔗 [BLE] Connecting wirelessly to {target_device.name or target_device.address}...")
+            async with BleakClient(target_device.address) as client:
+                print(f"✅ [BLE] Connected wirelessly to {target_device.name}!")
+                await client.start_notify(NUS_TX_CHAR_UUID, handle_rx)
+                print("📥 [BLE] Subscribed to Nordic UART stream. Streaming live wireless telemetry to MQTT...")
+
+                while client.is_connected:
+                    await asyncio.sleep(1)
+
+            print("⚠️ [BLE] Disconnected from wireless node. Rescanning...")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[BLE-ERR] Communication error: {e}. Retrying in 3s...")
+            await asyncio.sleep(3)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi 5 / PC Condition Monitoring Telemetry Gateway")
     parser.add_argument("--host", default=DEFAULT_BROKER_HOST, help="MQTT Broker Host (default: localhost)")
     parser.add_argument("--port", type=int, default=DEFAULT_BROKER_PORT, help="MQTT Broker Port (default: 1883)")
     parser.add_argument("--asset", default="test-rig-a", help="Monitored Asset ID fallback (default: test-rig-a or auto-detected from microcontroller)")
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SEC, help="Publish interval in seconds (default: 1.0)")
-    parser.add_argument("--mode", default="simulation", choices=["simulation", "serial"], help="Data mode: 'simulation' or 'serial' (USB Seeed Studio XIAO)")
+    parser.add_argument("--mode", default="simulation", choices=["simulation", "serial", "ble"], help="Data mode: 'simulation', 'serial' (USB Seeed Studio XIAO), or 'ble' (Wireless Bluetooth)")
     parser.add_argument("--serial-port", default=None, help="Explicit USB serial port (e.g. /dev/cu.usbmodem1101 or /dev/ttyACM0). Auto-detects if omitted.")
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD_RATE, help="Serial baud rate (default: 115200)")
     parser.add_argument("--gateway-id", default=DEFAULT_GATEWAY_ID, help="Gateway identifier")
@@ -181,6 +280,19 @@ def main():
         print(f"⚠️ Connection error: {e}")
         print("💡 Make sure Mosquitto container is running (docker compose up -d)")
 
+    # Dispatch to Bluetooth Low Energy async mode
+    if args.mode == "ble":
+        print(f"🚀 Gateway started [BLE WIRELESS mode]")
+        try:
+            asyncio.run(run_ble_mode(client, args))
+        except KeyboardInterrupt:
+            print("\n🛑 Gateway stopped by user.")
+        finally:
+            client.loop_stop()
+            client.disconnect()
+        return
+
+    # Standard Serial USB or Simulation mode
     try:
         reader = SensorReader(mode=args.mode, asset_id=args.asset, port=args.serial_port, baud=args.baud)
     except ConnectionError:
