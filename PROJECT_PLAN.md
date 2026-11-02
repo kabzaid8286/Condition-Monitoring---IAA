@@ -27,21 +27,23 @@
 - [x] **Gateway USB Serial Ingestion**: Created `gateway/rpi_publisher.py` with auto-reconnecting serial reader (`pyserial`) supporting macOS (`/dev/cu.usbmodem*`) and Linux (`/dev/ttyACM*`).
 - [x] **End-to-End Live Verification**: Verified live streaming from Seeed Studio XIAO $\rightarrow$ USB Serial $\rightarrow$ `rpi_publisher.py` $\rightarrow$ Mosquitto MQTT $\rightarrow$ FastAPI WebSocket $\rightarrow$ React SPA dashboard.
 
-## Phase 4: Telemetry Stabilization & Custom Asset Persistence (Completed)
+## Phase 4: Telemetry Stabilization & Multi-Sensor Hardware Auto-Detection (Completed)
 - [x] **Glitch Resolution**: Pre-seeded rolling buffers with 20 baseline points to eliminate blank sparklines and chart dropouts.
 - [x] **Hardware Heartbeat Watchdog**: Dashboard dynamically displays `Live WS (RPi 5)` when live packets stream and `Hardware Offline` when the microcontroller is unplugged.
 - [x] **Custom Asset Persistence**: Custom test designs created in `Test Design` persist in `localStorage` across reloads and execute virtual telemetry simulations with their configured baseline parameters.
-- [x] **Code Cleanliness**: Pruned all mock machine profiles down to the single active test rig (`test-rig-a`).
+- [x] **Multi-Sensor Hardware Auto-Detection**: Firmware natively reads the unique silicon chip ID (`xiao_nrf54l15::Ficr::deviceId()`) to dynamically identify twin Seeed Studio XIAO boards (`xiao-xxxx`) without firmware collisions.
+- [x] **Per-Asset Zero/Null Isolation**: Synchronous state render isolation guarantees that unconnected machines instantly display pure 0/null values without transient 1-second switching glitches.
+- [x] **Dynamic Routing & Renaming**: Gateway routes packets by board ID, and the React frontend auto-registers any newly detected sensor node into the machine dropdown and Test Design for live renaming.
 
 ---
 
-## Phase 5: Physical Raspberry Pi 5 Gateway Deployment (Next Milestone)
-*Goal: Move gateway from development Mac to the physical Raspberry Pi 5 mounted on the test rig.*
-- [ ] Transfer `gateway/rpi_publisher.py` and its dependencies to the Raspberry Pi 5 OS (Debian Bookworm).
-- [ ] Connect the Seeed Studio XIAO sensor node to the Raspberry Pi 5 via USB-C.
-- [ ] Configure `rpi_publisher.py` as a `systemd` daemon (`condition-monitor-gateway.service`) for auto-start on boot.
-- [ ] Configure network routing so the Raspberry Pi 5 publishes MQTT telemetry over Wi-Fi/Ethernet to the backend server.
-- [ ] Test wireless/remote streaming from Raspberry Pi 5 to the centralized dashboard.
+## Phase 5: Wireless Bluetooth (BLE) & Raspberry Pi 5 Gateway Deployment (Current Milestone)
+*Goal: Enable wireless telemetry transmission over Bluetooth Low Energy (BLE) and move gateway daemon to the Raspberry Pi 5.*
+- [ ] **Firmware Dual-Mode (BLE + USB)**: Enable Nordic UART Service (NUS) in `xiao_condition_node.ino` for cable-free coin-cell telemetry transmission.
+- [ ] **Gateway BLE Ingestion**: Implement asynchronous Bluetooth LE scanner/receiver in `gateway/rpi_publisher.py` (via `bleak`) to ingest wireless telemetry on macOS and Linux (RPi 5).
+- [ ] **Transfer to Raspberry Pi 5**: Transfer `gateway/` and dependencies to Raspberry Pi 5 OS (Debian Bookworm).
+- [ ] **Systemd Headless Daemon**: Configure `condition-monitor-gateway.service` for automatic boot recovery and background execution.
+- [ ] **LAN/Wi-Fi MQTT Routing**: Route wireless MQTT traffic from the Raspberry Pi 5 to the central server/broker.
 
 ## Phase 6: Machine Learning Pipeline & Background Processing
 *Goal: Transition from baseline anomaly rules to automated ML inference on live telemetry batches.*

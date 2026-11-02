@@ -21,16 +21,18 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - C/C++ sketch compiled and flashed onto Seeed Studio XIAO.
   - Flash memory retains code permanently. Connecting the board via USB immediately starts data acquisition without re-flashing.
   - USB serial reader with auto-reconnection and heartbeat detection in `gateway/rpi_publisher.py`.
-- **Phase 4: Telemetry Stabilization & Custom Asset Persistence (Completed)**:
+- **Phase 4: Telemetry Stabilization & Multi-Sensor Hardware Auto-Detection (Completed)**:
   - Rolling history pre-seeding (20 points) eliminates blank sparklines and chart glitches.
   - Hardware heartbeat detection dynamically displays `Live WS (RPi 5)` when streaming vs `Hardware Offline` when unplugged.
-  - Custom test designs created in `Test Design` persist in `localStorage`, activate automatically, and run realistic virtual simulations (`Virtual Simulation` mode).
-  - Cleaned all mock assets down to the active physical machine (`test-rig-a`).
+  - Multi-Sensor Silicon Auto-Detection: XIAO firmware reads native silicon hardware chip ID (`xiao_nrf54l15::Ficr::deviceId()`), allowing identical twin boards (`xiao-xxxx`) to connect and stream concurrently without collisions.
+  - Synchronous Zero/Null Render Isolation: Switching dropdown to any offline machine immediately renders pure 0/null values without transient 1-second glitches.
+  - Custom test designs created in `Test Design` persist in `localStorage`, activate automatically, and support live sensor renaming.
 
 ## 4. Current Phase & Next Milestones
-- **Phase 5: Physical Raspberry Pi 5 Gateway Deployment (Current)**:
+- **Phase 5: Wireless Bluetooth (BLE) & Physical Raspberry Pi 5 Gateway Deployment (Current)**:
+  - Dual-mode firmware (BLE + USB Serial): Transmit sensor JSON telemetry wirelessly over Nordic UART Service (NUS).
+  - Implement BLE scanner in `gateway/rpi_publisher.py` using `bleak` for wireless sensor ingestion on macOS and Raspberry Pi 5.
   - Deploy `gateway/rpi_publisher.py` to the physical Raspberry Pi 5 mounted on the test rig.
-  - Connect the Seeed Studio XIAO via USB to the Raspberry Pi 5.
   - Configure `rpi_publisher.py` as a systemd service for automatic reboot recovery and headless execution.
   - Route MQTT traffic across the local LAN / Wi-Fi to the central server/broker.
 - **Phase 6: Machine Learning Pipeline (Celery + Redis)**:
