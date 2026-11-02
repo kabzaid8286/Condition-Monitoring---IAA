@@ -39,37 +39,63 @@
 #define PIN_TEMP_PROBE      0    // Analog Temp Probe or ADC (Pin 0 / A0)
 #define PIN_BATTERY_SENSE   1    // Battery voltage divider (Pin 1 / A1)
 
+#if defined(ARDUINO_ARCH_NRF54L15CLEAN)
+#include <nrf54l15_hal_ficr.h>
+#endif
+
 // ==========================================
 // HARDWARE IDENTITY DETECTION
 // ==========================================
 
-String getUniqueBoardId() {
-  char buf[24];
-#if defined(ESP32)
+static char g_uniqueId[28] = {0};
+static char g_friendlyName[48] = {0};
+
+const char* getUniqueBoardId() {
+  if (g_uniqueId[0] != '\0') return g_uniqueId;
+
+#if defined(ARDUINO_ARCH_NRF54L15CLEAN)
+  uint64_t devId = xiao_nrf54l15::Ficr::deviceId();
+  uint32_t high = (uint32_t)(devId >> 32);
+  uint32_t low = (uint32_t)(devId & 0xFFFFFFFF);
+  snprintf(g_uniqueId, sizeof(g_uniqueId), "xiao-%04x%04x", (unsigned int)(high & 0xFFFF), (unsigned int)(low & 0xFFFF));
+#elif defined(ESP32)
   uint64_t chipid = ESP.getEfuseMac();
   uint16_t high = (uint16_t)(chipid >> 32);
   uint32_t low = (uint32_t)chipid;
-  snprintf(buf, sizeof(buf), "xiao-%04x%04x", (uint16_t)(high & 0xFFFF), (uint16_t)(low & 0xFFFF));
+  snprintf(g_uniqueId, sizeof(g_uniqueId), "xiao-%04x%04x", (unsigned int)(high & 0xFFFF), (unsigned int)(low & 0xFFFF));
 #elif defined(ARDUINO_ARCH_RP2040)
   pico_unique_board_id_t pId;
   pico_get_unique_board_id(&pId);
-  snprintf(buf, sizeof(buf), "xiao-%02x%02x%02x%02x", pId.id[4], pId.id[5], pId.id[6], pId.id[7]);
+  snprintf(g_uniqueId, sizeof(g_uniqueId), "xiao-%02x%02x%02x%02x", pId.id[4], pId.id[5], pId.id[6], pId.id[7]);
 #elif defined(ARDUINO_ARCH_SAMD)
   volatile uint32_t *p = (volatile uint32_t *)0x0080A00C;
-  snprintf(buf, sizeof(buf), "xiao-%04x", (uint16_t)(*p & 0xFFFF));
+  snprintf(g_uniqueId, sizeof(g_uniqueId), "xiao-%04x", (unsigned int)(*p & 0xFFFF));
 #else
-  snprintf(buf, sizeof(buf), "xiao-%04x", (uint16_t)random(0x1000, 0xFFFF));
+  snprintf(g_uniqueId, sizeof(g_uniqueId), "xiao-%04x", (unsigned int)random(0x1000, 0xFFFF));
 #endif
-  return String(buf);
+
+  return g_uniqueId;
 }
 
-String getBoardFriendlyName(String uniqueId) {
-  String suffix = uniqueId;
-  if (suffix.startsWith("xiao-")) {
-    suffix = suffix.substring(5);
-    suffix.toUpperCase();
+const char* getBoardFriendlyName(const char* uniqueId) {
+  if (g_friendlyName[0] != '\0') return g_friendlyName;
+
+  const char* suffix = uniqueId;
+  if (strncmp(suffix, "xiao-", 5) == 0) {
+    suffix += 5;
   }
-  return "Sensor Node (" + suffix + ")";
+  
+  char upperSuffix[24] = {0};
+  size_t i = 0;
+  for (; suffix[i] != '\0' && i < sizeof(upperSuffix) - 1; i++) {
+    char c = suffix[i];
+    if (c >= 'a' && c <= 'z') c -= 32;
+    upperSuffix[i] = c;
+  }
+  upperSuffix[i] = '\0';
+
+  snprintf(g_friendlyName, sizeof(g_friendlyName), "Sensor Node (%s)", upperSuffix);
+  return g_friendlyName;
 }
 
 // ==========================================
@@ -125,13 +151,13 @@ void setup() {
   }
 
   // Resolve dynamic unique identity
-  String effectiveAssetId = String(ASSET_ID);
-  String effectiveAssetName = String(ASSET_NAME);
+  const char* effectiveAssetId = ASSET_ID;
+  const char* effectiveAssetName = ASSET_NAME;
 
-  if (effectiveAssetId == "auto" || effectiveAssetId.length() == 0) {
+  if (strcmp(effectiveAssetId, "auto") == 0 || strlen(effectiveAssetId) == 0) {
     effectiveAssetId = getUniqueBoardId();
   }
-  if (effectiveAssetName == "auto" || effectiveAssetName.length() == 0) {
+  if (strcmp(effectiveAssetName, "auto") == 0 || strlen(effectiveAssetName) == 0) {
     effectiveAssetName = getBoardFriendlyName(effectiveAssetId);
   }
 
