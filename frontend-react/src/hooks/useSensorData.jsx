@@ -50,52 +50,74 @@ function getInitialDataBuffer(assetId) {
 
 export default function useSensorData(activeAsset = 'test-rig-a') {
   const { assets, autoRegisterSensor } = useAssets();
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionMode, setConnectionMode] = useState('offline'); // 'live' | 'offline'
 
-  const [data, setData] = useState(() => getInitialDataBuffer(activeAsset));
-  const [kpis, setKpis] = useState(OFFLINE_KPIS);
+  // Per-asset tracking maps
+  const assetLastPacketTimeRef = useRef({}); // { [assetId]: timestamp }
+  const assetDataMapRef = useRef({});        // { [assetId]: dataBuffer }
+  const assetKpisMapRef = useRef({});        // { [assetId]: kpiObject }
+
+  // Check if current asset is live right now
+  const isCurrentLiveInitial = () => {
+    const t = assetLastPacketTimeRef.current[activeAsset] || 0;
+    return t > 0 && (Date.now() - t) <= 3500;
+  };
+
+  const [currentSelectedAsset, setCurrentSelectedAsset] = useState(activeAsset);
+  const [isConnected, setIsConnected] = useState(isCurrentLiveInitial);
+  const [connectionMode, setConnectionMode] = useState(isCurrentLiveInitial() ? 'live' : 'offline');
+  const [data, setData] = useState(() => assetDataMapRef.current[activeAsset] || getInitialDataBuffer(activeAsset));
+  const [kpis, setKpis] = useState(() => isCurrentLiveInitial() ? (assetKpisMapRef.current[activeAsset] || OFFLINE_KPIS) : OFFLINE_KPIS);
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const activeAssetRef = useRef(activeAsset);
-  const lastTelemetryTimeRef = useRef(0);
 
   useEffect(() => {
     activeAssetRef.current = activeAsset;
   }, [activeAsset]);
 
-  // When activeAsset changes, load recorded history for that asset or zero buffer
-  const prevAssetRef = useRef(activeAsset);
-  useEffect(() => {
-    if (prevAssetRef.current !== activeAsset) {
-      prevAssetRef.current = activeAsset;
+  // Synchronous state adjustment during render when activeAsset changes
+  // Eliminates 1-second transient glitches when switching machines
+  if (currentSelectedAsset !== activeAsset) {
+    setCurrentSelectedAsset(activeAsset);
+    const lastSeen = assetLastPacketTimeRef.current[activeAsset] || 0;
+    const isLiveNow = lastSeen > 0 && (Date.now() - lastSeen) <= 3500;
+
+    if (isLiveNow) {
+      setData(assetDataMapRef.current[activeAsset] || getInitialDataBuffer(activeAsset));
+      setKpis(assetKpisMapRef.current[activeAsset] || OFFLINE_KPIS);
+      setIsConnected(true);
+      setConnectionMode('live');
+    } else {
+      // Unconnected machine: immediately zero / offline
       setData(getInitialDataBuffer(activeAsset));
       setKpis(OFFLINE_KPIS);
-      lastTelemetryTimeRef.current = 0;
-      setConnectionMode('offline');
       setIsConnected(false);
+      setConnectionMode('offline');
     }
-  }, [activeAsset]);
+  }
 
   // Unified WebSocket Listener for all hardware sensors (with Heartbeat & Auto-Detection)
   useEffect(() => {
     let isUnmounted = false;
 
-    // Heartbeat monitor: checks if actual packets arrived within the last 4.5 seconds
+    // Heartbeat monitor: evaluates strictly against the active asset's last packet time
     const heartbeatTimer = setInterval(() => {
       if (isUnmounted) return;
-      const timeSinceLastPacket = Date.now() - lastTelemetryTimeRef.current;
-      if (lastTelemetryTimeRef.current > 0 && timeSinceLastPacket <= 4500) {
+      const currentAsset = activeAssetRef.current;
+      const lastSeen = assetLastPacketTimeRef.current[currentAsset] || 0;
+      const isLiveNow = lastSeen > 0 && (Date.now() - lastSeen) <= 3500;
+
+      if (isLiveNow) {
         setConnectionMode('live');
         setIsConnected(true);
       } else {
-        // Disconnected or unplugged: drop live gauges to zero/offline
+        // Disconnected or unplugged: drop live gauges strictly to zero/offline
         setConnectionMode('offline');
         setIsConnected(false);
         setKpis(OFFLINE_KPIS);
       }
-    }, 1500);
+    }, 1000);
 
     const connectWebSocket = () => {
       if (isUnmounted) return;
@@ -110,7 +132,6 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
 
         socket.onopen = () => {
           if (isUnmounted) return;
-          // Remains offline until live TELEMETRY packets actually stream from hardware
         };
 
         socket.onmessage = (event) => {
@@ -120,103 +141,82 @@ export default function useSensorData(activeAsset = 'test-rig-a') {
 
             // 1. Process SNAPSHOT
             if (payload.type === 'SNAPSHOT' && payload.data) {
-              // Auto-detect any unknown assets present in snapshot
               Object.keys(payload.data).forEach(id => {
                 if (autoRegisterSensor) {
                   autoRegisterSensor(id);
                 }
               });
-
-              const currentReading = payload.data[activeAssetRef.current];
-              if (currentReading && parseFloat(currentReading.vibX || 0) > 0) {
-                const vx = parseFloat(currentReading.vibX).toFixed(2);
-                const tp = parseFloat(currentReading.temp || 0).toFixed(1);
-                const rp = Math.round(parseFloat(currentReading.rpm || 0));
-
-                setKpis({
-                  vibRms: vx,
-                  temp: tp,
-                  rpm: rp,
-                  health: Math.max(0, Math.min(100, Math.round(100 - (parseFloat(vx) * 3.5)))),
-                  motorLoad: Math.min(100, Math.round((rp / 3000) * 100)),
-                  battery: currentReading.battery_pct !== undefined ? currentReading.battery_pct : 100,
-                  burstState: currentReading.burst_state || 'active'
-                });
-              }
             } 
             // 2. Process Live TELEMETRY Packet
             else if (payload.type === 'TELEMETRY' && payload.data) {
               const item = payload.data;
               const incomingId = item.asset_id;
 
+              if (!incomingId) return;
+
               // Auto-detect new sensor if not yet registered in system design
-              if (incomingId && autoRegisterSensor) {
+              if (autoRegisterSensor) {
                 autoRegisterSensor(incomingId, item.name || item.asset_name);
               }
 
-              // Update data if packet matches currently active asset
+              // Update last packet timestamp for THIS specific sensor
+              assetLastPacketTimeRef.current[incomingId] = Date.now();
+
+              const rawVx = parseFloat(item.vibX || 0);
+              const rawVy = parseFloat(item.vibY || 0);
+              const rawTp = parseFloat(item.temp || 0);
+              const rawRp = Math.round(parseFloat(item.rpm || 0));
+              const burstSt = item.burst_state || 'active';
+
+              const timeStr = item.time 
+                ? new Date(item.time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+              const vx = rawVx.toFixed(2);
+              const vy = rawVy.toFixed(2);
+              const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(2) : (rawVy * 0.85).toFixed(2);
+              const tp = rawTp.toFixed(1);
+              const rp = rawRp;
+
+              const maxPoints = 30;
+              const existingData = assetDataMapRef.current[incomingId] || getInitialDataBuffer(incomingId);
+              const slide = (arr, val) => arr.length >= maxPoints ? [...arr.slice(1), val] : [...arr, val];
+              const nextData = {
+                labels: slide(existingData.labels, timeStr),
+                vibX: slide(existingData.vibX, vx),
+                vibY: slide(existingData.vibY, vy),
+                vibZ: slide(existingData.vibZ, vz),
+                temp: slide(existingData.temp, tp),
+                rpm: slide(existingData.rpm, rp)
+              };
+
+              assetDataMapRef.current[incomingId] = nextData;
+
+              // Persist recorded telemetry for this sensor
+              try {
+                localStorage.setItem(`recorded_telemetry_${incomingId}`, JSON.stringify(nextData));
+              } catch (e) {
+                // ignore
+              }
+
+              const nextKpis = {
+                vibRms: vx,
+                temp: tp,
+                rpm: rp,
+                health: Math.max(0, Math.min(100, Math.round(100 - (parseFloat(vx) * 3.5)))),
+                motorLoad: Math.min(100, Math.round((rp / 3000) * 100)),
+                battery: item.battery_pct !== undefined ? item.battery_pct : 98,
+                burstState: burstSt
+              };
+
+              assetKpisMapRef.current[incomingId] = nextKpis;
+
+              // Only update live active UI state if this packet matches the currently selected machine
               if (incomingId === activeAssetRef.current) {
-                lastTelemetryTimeRef.current = Date.now();
                 setConnectionMode('live');
                 setIsConnected(true);
-
-                const rawVx = parseFloat(item.vibX || 0);
-                const rawVy = parseFloat(item.vibY || 0);
-                const rawTp = parseFloat(item.temp || 0);
-                const rawRp = Math.round(parseFloat(item.rpm || 0));
-                const burstSt = item.burst_state || 'active';
-
-                // Retain last known readings during duty-cycle deep sleep
-                if (rawVx === 0 && rawTp === 0 && burstSt === 'sleep') {
-                  setKpis(k => ({
-                    ...k,
-                    burstState: 'sleep',
-                    battery: item.battery_pct !== undefined ? item.battery_pct : k.battery
-                  }));
-                  return;
-                }
-
-                const timeStr = item.time 
-                  ? new Date(item.time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                  : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-                const vx = rawVx.toFixed(2);
-                const vy = rawVy.toFixed(2);
-                const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(2) : (rawVy * 0.85).toFixed(2);
-                const tp = rawTp.toFixed(1);
-                const rp = rawRp;
-
-                const maxPoints = 30;
-                setData(prev => {
-                  const slide = (arr, val) => arr.length >= maxPoints ? [...arr.slice(1), val] : [...arr, val];
-                  const nextData = {
-                    labels: slide(prev.labels, timeStr),
-                    vibX: slide(prev.vibX, vx),
-                    vibY: slide(prev.vibY, vy),
-                    vibZ: slide(prev.vibZ, vz),
-                    temp: slide(prev.temp, tp),
-                    rpm: slide(prev.rpm, rp)
-                  };
-
-                  // Persist recorded data so it is retained after disconnecting
-                  try {
-                    localStorage.setItem(`recorded_telemetry_${activeAssetRef.current}`, JSON.stringify(nextData));
-                  } catch (e) {
-                    // ignore quota limits
-                  }
-
-                  return nextData;
-                });
-
-                setKpis({
-                  vibRms: vx,
-                  temp: tp,
-                  rpm: rp,
-                  health: Math.max(0, Math.min(100, Math.round(100 - (parseFloat(vx) * 3.5)))),
-                  motorLoad: Math.min(100, Math.round((rp / 3000) * 100)),
-                  battery: item.battery_pct !== undefined ? item.battery_pct : 98,
-                  burstState: burstSt
-                });
+                setData(nextData);
+                setKpis(nextKpis);
               }
             }
           } catch (err) {
