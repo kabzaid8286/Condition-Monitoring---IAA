@@ -20,8 +20,14 @@
 // ==========================================
 // CONFIGURATION & TIMINGS
 // ==========================================
-#define ASSET_ID "test-rig-a"
-#define BAUD_RATE 115200
+// Unique Sensor / Asset Identification:
+// - Set to "auto" (default): The board reads its unique hardware chip ID / MAC address
+//   so every physical XIAO board automatically gets a distinct ID (e.g., "xiao-7a2b")
+//   and distinct name (e.g., "Sensor Node (7A2B)") on the dashboard.
+// - Or set to any custom machine name (e.g., "test-rig-b", "motor-02", "pump-drive").
+#define ASSET_ID    "auto"
+#define ASSET_NAME  "auto"
+#define BAUD_RATE   115200
 
 // Duty cycle: 10 seconds of streaming, followed by sleep
 // (Set SLEEP_DURATION_SEC to 290 for 5-minute industrial battery deployment)
@@ -34,10 +40,43 @@
 #define PIN_BATTERY_SENSE   1    // Battery voltage divider (Pin 1 / A1)
 
 // ==========================================
+// HARDWARE IDENTITY DETECTION
+// ==========================================
+
+String getUniqueBoardId() {
+  char buf[24];
+#if defined(ESP32)
+  uint64_t chipid = ESP.getEfuseMac();
+  uint16_t high = (uint16_t)(chipid >> 32);
+  uint32_t low = (uint32_t)chipid;
+  snprintf(buf, sizeof(buf), "xiao-%04x%04x", (uint16_t)(high & 0xFFFF), (uint16_t)(low & 0xFFFF));
+#elif defined(ARDUINO_ARCH_RP2040)
+  pico_unique_board_id_t pId;
+  pico_get_unique_board_id(&pId);
+  snprintf(buf, sizeof(buf), "xiao-%02x%02x%02x%02x", pId.id[4], pId.id[5], pId.id[6], pId.id[7]);
+#elif defined(ARDUINO_ARCH_SAMD)
+  volatile uint32_t *p = (volatile uint32_t *)0x0080A00C;
+  snprintf(buf, sizeof(buf), "xiao-%04x", (uint16_t)(*p & 0xFFFF));
+#else
+  snprintf(buf, sizeof(buf), "xiao-%04x", (uint16_t)random(0x1000, 0xFFFF));
+#endif
+  return String(buf);
+}
+
+String getBoardFriendlyName(String uniqueId) {
+  String suffix = uniqueId;
+  if (suffix.startsWith("xiao-")) {
+    suffix = suffix.substring(5);
+    suffix.toUpperCase();
+  }
+  return "Sensor Node (" + suffix + ")";
+}
+
+// ==========================================
 // SENSOR READING HELPERS
 // ==========================================
 
-// Read battery state of charge (percentage from coin-ce    ll voltage)
+// Read battery state of charge (percentage from coin-cell voltage)
 int readBatteryPercentage() {
 #if defined(PIN_BATTERY_SENSE)
   int raw = analogRead(PIN_BATTERY_SENSE);
@@ -54,8 +93,6 @@ int readBatteryPercentage() {
 float readTemperatureProbe() {
 #if defined(PIN_TEMP_PROBE)
   int raw = analogRead(PIN_TEMP_PROBE);
-  // Linear approximation or RTD/thermistor formula (adjust calibration factor
-  // as needed)
   float tempC = (raw / 4095.0f) * 100.0f;
   if (tempC < 5.0f || tempC > 120.0f) {
     tempC = 45.0f; // Nominal baseline if probe floating
@@ -68,9 +105,6 @@ float readTemperatureProbe() {
 
 // Read Vibration X and Y axes (mm/s or g-force)
 void readVibration(float &vibX, float &vibY) {
-  // If using I2C Accelerometer (e.g. ADXL345 / LIS3DH / MPU6050):
-  // You can insert Wire.read() registers here.
-  // Below provides a calibrated analog/noise baseline:
   static float t = 0.0f;
   t += 0.2f;
   vibX = 2.4f + sin(t) * 0.4f + ((float)(random(-15, 15)) / 100.0f);
@@ -90,8 +124,22 @@ void setup() {
     delay(10);
   }
 
-  Serial.println("{\"log\":\"[XIAO] Woke from sleep. Starting 10s burst "
-                 "acquisition...\"}");
+  // Resolve dynamic unique identity
+  String effectiveAssetId = String(ASSET_ID);
+  String effectiveAssetName = String(ASSET_NAME);
+
+  if (effectiveAssetId == "auto" || effectiveAssetId.length() == 0) {
+    effectiveAssetId = getUniqueBoardId();
+  }
+  if (effectiveAssetName == "auto" || effectiveAssetName.length() == 0) {
+    effectiveAssetName = getBoardFriendlyName(effectiveAssetId);
+  }
+
+  Serial.print("{\"log\":\"[XIAO] Online as ");
+  Serial.print(effectiveAssetName);
+  Serial.print(" (ID: ");
+  Serial.print(effectiveAssetId);
+  Serial.println("). Starting burst acquisition...\"}");
 
   // Execute the 10-second high-frequency burst
   unsigned long burstStartTime = millis();
@@ -109,9 +157,11 @@ void setup() {
       float temp = readTemperatureProbe();
       int batteryPct = readBatteryPercentage();
 
-      // Output JSON line to USB Serial
+      // Output JSON line to USB Serial with unique asset_id and friendly name
       Serial.print("{\"asset_id\":\"");
-      Serial.print(ASSET_ID);
+      Serial.print(effectiveAssetId);
+      Serial.print("\",\"name\":\"");
+      Serial.print(effectiveAssetName);
       Serial.print("\",\"vibration_x\":");
       Serial.print(vibX, 3);
       Serial.print(",\"vibration_y\":");

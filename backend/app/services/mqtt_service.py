@@ -54,6 +54,7 @@ class TelemetryHub:
         try:
             payload = json.loads(msg.payload.decode('utf-8'))
             asset_id = payload.get("asset_id", "test-rig-a")
+            asset_name = payload.get("name") or payload.get("asset_name") or asset_id.replace('-', ' ').title()
             sensors = payload.get("sensors", {})
 
             previous = self.latest_readings.get(asset_id, {})
@@ -75,6 +76,8 @@ class TelemetryHub:
 
             data_item = {
                 "asset_id": asset_id,
+                "name": asset_name,
+                "asset_name": asset_name,
                 "vibX": vx,
                 "vibY": vy,
                 "temp": tp,

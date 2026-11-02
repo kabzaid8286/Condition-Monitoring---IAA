@@ -61,18 +61,40 @@ export const AssetProvider = ({ children }) => {
   }, []);
 
   const autoRegisterSensor = useCallback((id, optionalName) => {
+    if (!id) return;
+    const cleanId = String(id).trim();
     setAssets(prev => {
-      if (prev[id]) return prev; // Already registered
+      // If already registered
+      if (prev[cleanId]) {
+        if (optionalName && prev[cleanId].name !== optionalName && !prev[cleanId].isCustom) {
+          const updated = {
+            ...prev,
+            [cleanId]: {
+              ...prev[cleanId],
+              name: optionalName
+            }
+          };
+          saveAssets(updated);
+          return updated;
+        }
+        return prev;
+      }
 
-      // Generate a friendly name if none provided
-      const cleanId = String(id || '').trim();
-      const randomSuffix = Math.floor(100 + Math.random() * 900);
-      const generatedName = optionalName 
-        || (cleanId.startsWith('sensor') ? `Sensor Node ${cleanId.replace(/^sensor-?/i, '')}` : `Sensor Node-${randomSuffix}`);
+      // Friendly distinct name based on ID
+      let formattedName = optionalName;
+      if (!formattedName) {
+        if (cleanId.startsWith('xiao-')) {
+          formattedName = `Sensor Node (${cleanId.replace(/^xiao-/i, '').toUpperCase()})`;
+        } else if (cleanId.startsWith('sensor-')) {
+          formattedName = `Sensor Node ${cleanId.replace(/^sensor-/i, '').toUpperCase()}`;
+        } else {
+          formattedName = cleanId.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+      }
 
       const newAsset = {
-        name: generatedName,
-        label: 'Auto-Detected Hardware Node',
+        name: formattedName,
+        label: 'Auto-Detected Sensor Node',
         basevib: 0,
         basetemp: 0,
         baserpm: 0,

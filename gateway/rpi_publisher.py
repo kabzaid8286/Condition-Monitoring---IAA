@@ -104,13 +104,17 @@ class SensorReader:
                         continue
 
                     if "vibration_x" in data or "vib_x" in data:
+                        asset_id = str(data.get("asset_id") or self.asset_id).strip()
+                        asset_name = str(data.get("name") or data.get("asset_name") or asset_id.replace('-', ' ').title()).strip()
                         reading = {
                             "vibration_x": float(data.get("vibration_x", data.get("vib_x", 0.0))),
                             "vibration_y": float(data.get("vibration_y", data.get("vib_y", 0.0))),
                             "temperature": float(data.get("temperature", data.get("temp", 0.0))),
                             "rpm": float(data.get("rpm", 1480.0)),
                             "battery_pct": int(data.get("battery_pct", data.get("battery", 100))),
-                            "burst_state": str(data.get("burst_state", "active"))
+                            "burst_state": str(data.get("burst_state", "active")),
+                            "_asset_id": asset_id,
+                            "_asset_name": asset_name
                         }
                         self.last_reading = reading
                         return reading
@@ -150,7 +154,7 @@ def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi 5 / PC Condition Monitoring Telemetry Gateway")
     parser.add_argument("--host", default=DEFAULT_BROKER_HOST, help="MQTT Broker Host (default: localhost)")
     parser.add_argument("--port", type=int, default=DEFAULT_BROKER_PORT, help="MQTT Broker Port (default: 1883)")
-    parser.add_argument("--asset", default="test-rig-a", choices=list(ASSET_BASELINES.keys()), help="Monitored Asset ID")
+    parser.add_argument("--asset", default="test-rig-a", help="Monitored Asset ID fallback (default: test-rig-a or auto-detected from microcontroller)")
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SEC, help="Publish interval in seconds (default: 1.0)")
     parser.add_argument("--mode", default="simulation", choices=["simulation", "serial"], help="Data mode: 'simulation' or 'serial' (USB Seeed Studio XIAO)")
     parser.add_argument("--serial-port", default=None, help="Explicit USB serial port (e.g. /dev/cu.usbmodem1101 or /dev/ttyACM0). Auto-detects if omitted.")
@@ -184,17 +188,21 @@ def main():
         reader = SensorReader(mode="simulation", asset_id=args.asset)
         args.mode = "simulation"
 
-    topic = f"sensors/{args.asset}/telemetry"
-
     print(f"🚀 Gateway started [{args.mode.upper()} mode]")
-    print(f"📡 Publishing to topic: {topic} at {1.0 / args.interval:.1f} Hz")
+    print(f"📡 Dynamic MQTT Telemetry publishing at {1.0 / args.interval:.1f} Hz")
     print("Press Ctrl+C to stop.\n")
 
     try:
         while True:
             readings = reader.read_telemetry()
+            current_asset_id = readings.pop("_asset_id", args.asset)
+            current_asset_name = readings.pop("_asset_name", current_asset_id.replace('-', ' ').title())
+
+            topic = f"sensors/{current_asset_id}/telemetry"
             payload = {
-                "asset_id": args.asset,
+                "asset_id": current_asset_id,
+                "asset_name": current_asset_name,
+                "name": current_asset_name,
                 "gateway_id": args.gateway_id,
                 "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "sensors": readings,
@@ -203,7 +211,7 @@ def main():
 
             msg_str = json.dumps(payload)
             client.publish(topic, msg_str, qos=0)
-            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{args.asset}] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings.get('battery_pct', 100)}%")
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{current_asset_id} ({current_asset_name})] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings.get('battery_pct', 100)}%")
 
             time.sleep(args.interval)
     except KeyboardInterrupt:
