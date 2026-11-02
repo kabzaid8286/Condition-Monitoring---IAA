@@ -27,14 +27,17 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Multi-Sensor Silicon Auto-Detection: XIAO firmware reads native silicon hardware chip ID (`xiao_nrf54l15::Ficr::deviceId()`), allowing identical twin boards (`xiao-xxxx`) to connect and stream concurrently without collisions.
   - Synchronous Zero/Null Render Isolation: Switching dropdown to any offline machine immediately renders pure 0/null values without transient 1-second glitches.
   - Custom test designs created in `Test Design` persist in `localStorage`, activate automatically, and support live sensor renaming.
+- **Phase 5: Wireless Bluetooth (BLE) & Multi-Node Concurrent Streaming (Completed)**:
+  - Dual-mode firmware (BLE + USB Serial): Transmits telemetry wirelessly over Nordic UART Service (NUS) using atomic single-chunk buffers and Apple/Linux compliant intervals.
+  - Microcontroller Flash Permanence: Sketch runs permanently from flash memory; coin-cell battery power enables 100% cable-free transmission.
+  - Multi-Node BLE Ingestion Daemon: `gateway/rpi_publisher.py` concurrently discovers, connects to, and streams from multiple Seeed Studio XIAO sensor nodes (`IAA-*`) simultaneously using asynchronous client pooling.
 
 ## 4. Current Phase & Next Milestones
-- **Phase 5: Wireless Bluetooth (BLE) & Physical Raspberry Pi 5 Gateway Deployment (Current)**:
-  - Dual-mode firmware (BLE + USB Serial): Transmit sensor JSON telemetry wirelessly over Nordic UART Service (NUS).
-  - Implement BLE scanner in `gateway/rpi_publisher.py` using `bleak` for wireless sensor ingestion on macOS and Raspberry Pi 5.
-  - Deploy `gateway/rpi_publisher.py` to the physical Raspberry Pi 5 mounted on the test rig.
-  - Configure `rpi_publisher.py` as a systemd service for automatic reboot recovery and headless execution.
-  - Route MQTT traffic across the local LAN / Wi-Fi to the central server/broker.
+- **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:
+  - Deploy `gateway/rpi_publisher.py` directly to the physical Raspberry Pi 5 mounted on the test rig.
+  - Configure `condition-monitor-gateway.service` as a systemd background daemon on the Pi 5 for headless boot recovery.
+  - The Raspberry Pi 5 ingests BLE from all wireless sensor nodes and publishes over the local network (LAN / Wi-Fi) to the central MQTT broker (`192.168.0.102:1883`).
+  - Completely decouples the Mac from Bluetooth and local gateway processes; dashboard on the Mac (or any LAN device) simply streams live telemetry over WebSocket.
 - **Phase 6: Machine Learning Pipeline (Celery + Redis)**:
   - Implement rolling-window anomaly scoring with LSTM Autoencoders and XGBoost.
   - Wire ML inference results into TimescaleDB and live WebSocket broadcasts.

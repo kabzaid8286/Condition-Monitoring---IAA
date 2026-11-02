@@ -37,13 +37,19 @@
 
 ---
 
-## Phase 5: Wireless Bluetooth (BLE) & Raspberry Pi 5 Gateway Deployment (Current Milestone)
-*Goal: Enable wireless telemetry transmission over Bluetooth Low Energy (BLE) and move gateway daemon to the Raspberry Pi 5.*
-- [x] **Firmware Dual-Mode (BLE + USB)**: Integrated Nordic UART Service (NUS) with `Bluefruit52Lib` in `xiao_condition_node.ino` for cable-free telemetry transmission.
+## Phase 5: Wireless Bluetooth (BLE) & Multi-Node Concurrent Streaming (Completed)
+- [x] **Firmware Dual-Mode (BLE + USB)**: Integrated Nordic UART Service (NUS) with `Bluefruit52Lib` in `xiao_condition_node.ino` for cable-free telemetry transmission with Apple/Linux compliant intervals.
+- [x] **Silicon Device ID Auto-Detection**: Firmware queries hardware FICR registers (`xiao_nrf54l15::Ficr::deviceId()`), guaranteeing duplicate boards self-assign unique IDs without code collision.
 - [x] **Gateway BLE Ingestion**: Implemented asynchronous Bluetooth LE scanner/receiver in `gateway/rpi_publisher.py` (via `bleak`), verified live wireless reception (`[BLE-WIRELESS]`) and MQTT forwarding.
-- [ ] **Transfer to Raspberry Pi 5**: Transfer `gateway/` and dependencies to Raspberry Pi 5 OS (Debian Bookworm).
-- [ ] **Systemd Headless Daemon**: Configure `condition-monitor-gateway.service` for automatic boot recovery and background execution.
-- [ ] **LAN/Wi-Fi MQTT Routing**: Route wireless MQTT traffic from the Raspberry Pi 5 to the central server/broker.
+- [x] **Multi-Node Concurrency**: Upgraded BLE gateway with asynchronous client pooling to stream from multiple wireless sensor nodes simultaneously.
+- [x] **Microcontroller Flash Permanence**: Verified code retention across power cycles; sensors start transmitting wirelessly upon coin-cell battery insertion.
+
+## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
+*Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*
+- [ ] **Transfer Gateway Code**: Sync `gateway/rpi_publisher.py` and requirements (`paho-mqtt`, `bleak`, `pyserial`) to the Raspberry Pi 5.
+- [ ] **Systemd Headless Daemon**: Configure `condition-monitor-gateway.service` on the Pi 5 for automatic boot recovery and 24/7 background operation.
+- [ ] **LAN/Wi-Fi MQTT Routing**: Configure the Pi 5 to publish ingested BLE sensor telemetry across the local LAN/Wi-Fi to the central server/broker (`192.168.0.102:1883`).
+- [ ] **Verification**: Confirm the React dashboard streams live telemetry from the Raspberry Pi 5 gateway without any Bluetooth or Python processes running on the Mac.
 
 ## Phase 6: Machine Learning Pipeline & Background Processing
 *Goal: Transition from baseline anomaly rules to automated ML inference on live telemetry batches.*
