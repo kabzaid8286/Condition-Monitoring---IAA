@@ -43,6 +43,8 @@
 - [x] **Gateway BLE Ingestion**: Implemented asynchronous Bluetooth LE scanner/receiver in `gateway/rpi_publisher.py` (via `bleak`), verified live wireless reception (`[BLE-WIRELESS]`) and MQTT forwarding.
 - [x] **Multi-Node Concurrency**: Upgraded BLE gateway with asynchronous client pooling to stream from multiple wireless sensor nodes simultaneously.
 - [x] **Microcontroller Flash Permanence**: Verified code retention across power cycles; sensors start transmitting wirelessly upon coin-cell battery insertion.
+- [x] **Physical Sensor Verification**: Verified live streaming with physical coin-cell node `IAA-xiao-bafdedc8` (`Sensor Node (BAFDEDC8)`).
+- [x] **Automation & Clean Auth**: Integrated BLE daemon into `start.sh` / `stop.sh` and set default clean login screen display.
 
 ## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
 *Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*

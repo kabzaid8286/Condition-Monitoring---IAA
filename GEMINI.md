@@ -31,12 +31,15 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Dual-mode firmware (BLE + USB Serial): Transmits telemetry wirelessly over Nordic UART Service (NUS) using atomic single-chunk buffers and Apple/Linux compliant intervals.
   - Microcontroller Flash Permanence: Sketch runs permanently from flash memory; coin-cell battery power enables 100% cable-free transmission.
   - Multi-Node BLE Ingestion Daemon: `gateway/rpi_publisher.py` concurrently discovers, connects to, and streams from multiple Seeed Studio XIAO sensor nodes (`IAA-*`) simultaneously using asynchronous client pooling.
+  - Verified live physical sensor streaming with hardware node `IAA-xiao-bafdedc8` (`Sensor Node (BAFDEDC8)`) delivering real-time dual-axis vibration, temperature, and RPM telemetry.
+  - Integrated BLE gateway lifecycle management into `start.sh` and `stop.sh`.
+  - Restored clean default login view (`useState(false)`) without storage sync conflicts.
 
 ## 4. Current Phase & Next Milestones
 - **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:
   - Deploy `gateway/rpi_publisher.py` directly to the physical Raspberry Pi 5 mounted on the test rig.
   - Configure `condition-monitor-gateway.service` as a systemd background daemon on the Pi 5 for headless boot recovery.
-  - The Raspberry Pi 5 ingests BLE from all wireless sensor nodes and publishes over the local network (LAN / Wi-Fi) to the central MQTT broker (`192.168.0.102:1883`).
+  - The Raspberry Pi 5 ingests BLE from all wireless sensor nodes (e.g. `IAA-xiao-bafdedc8`) and publishes over the local network (LAN / Wi-Fi) to the central MQTT broker (`192.168.0.102:1883`).
   - Completely decouples the Mac from Bluetooth and local gateway processes; dashboard on the Mac (or any LAN device) simply streams live telemetry over WebSocket.
 - **Phase 6: Machine Learning Pipeline (Celery + Redis)**:
   - Implement rolling-window anomaly scoring with LSTM Autoencoders and XGBoost.

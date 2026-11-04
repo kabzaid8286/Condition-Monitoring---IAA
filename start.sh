@@ -23,24 +23,31 @@ fi
 # 2. Function to clean up background processes on Ctrl+C
 cleanup() {
     echo ""
-    echo "🛑 Stopping FastAPI Backend and Vite Frontend..."
+    echo "🛑 Stopping FastAPI Backend, Vite Frontend, and BLE Gateway..."
     kill $BACKEND_PID 2>/dev/null
     kill $FRONTEND_PID 2>/dev/null
+    kill $GATEWAY_PID 2>/dev/null
     exit 0
 }
 trap cleanup SIGINT SIGTERM EXIT
 
 # 3. Start Backend (FastAPI on Port 8000)
 echo ""
-echo "[2/3] ⚙️  Starting FastAPI Backend (http://localhost:8000)..."
+echo "[2/4] ⚙️  Starting FastAPI Backend (http://localhost:8000)..."
 (cd backend && ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload) &
 BACKEND_PID=$!
 
 # 4. Start Frontend (React + Vite on Port 5173)
 echo ""
-echo "[3/3] 💻 Starting React Frontend (http://localhost:5173)..."
+echo "[3/4] 💻 Starting React Frontend (http://localhost:5173)..."
 (cd frontend-react && npm run dev -- --host) &
 FRONTEND_PID=$!
+
+# 5. Start Wireless BLE Ingestion Daemon
+echo ""
+echo "[4/4] 📡 Starting Bluetooth LE Gateway Ingestion..."
+.venv/bin/python3 gateway/rpi_publisher.py --mode ble &
+GATEWAY_PID=$!
 
 echo ""
 echo "=================================================="

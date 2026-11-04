@@ -9,14 +9,17 @@ import { toast } from './utils/toast';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
-      return localStorage.getItem('is_authenticated') === 'true';
+      // Clean up legacy localStorage persistence so login page always shows on fresh site visit
+      localStorage.removeItem('is_authenticated');
+      localStorage.removeItem('user_role');
+      return sessionStorage.getItem('is_authenticated') === 'true';
     } catch {
       return false;
     }
   });
   const [userRole, setUserRole] = useState(() => {
     try {
-      return localStorage.getItem('user_role') || null;
+      return sessionStorage.getItem('user_role') || null;
     } catch {
       return null;
     }
@@ -27,10 +30,10 @@ function App() {
     setUserRole(role);
     setIsAuthenticated(true);
     try {
-      localStorage.setItem('is_authenticated', 'true');
-      localStorage.setItem('user_role', role);
-      if (!localStorage.getItem('auth_token')) {
-        localStorage.setItem('auth_token', `session-${Date.now()}`);
+      sessionStorage.setItem('is_authenticated', 'true');
+      sessionStorage.setItem('user_role', role);
+      if (!sessionStorage.getItem('auth_token')) {
+        sessionStorage.setItem('auth_token', `session-${Date.now()}`);
       }
     } catch (e) {
       // Ignore storage errors
@@ -42,6 +45,9 @@ function App() {
     setUserRole(null);
     setIsAuthenticated(false);
     try {
+      sessionStorage.removeItem('is_authenticated');
+      sessionStorage.removeItem('user_role');
+      sessionStorage.removeItem('auth_token');
       localStorage.removeItem('is_authenticated');
       localStorage.removeItem('user_role');
       localStorage.removeItem('auth_token');
