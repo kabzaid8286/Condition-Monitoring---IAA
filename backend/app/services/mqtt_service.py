@@ -112,14 +112,19 @@ class TelemetryHub:
             else:
                 logger.warning(f"MQTT connection failed with code {rc}")
 
+        def on_disconnect(c, userdata, flags, rc, properties=None):
+            if rc != 0:
+                logger.warning(f"Unexpected MQTT disconnection (code {rc}). Reconnecting...")
+
         self.mqtt_client.on_connect = on_connect
+        self.mqtt_client.on_disconnect = on_disconnect
 
         try:
-            self.mqtt_client.connect(broker_host, broker_port, keepalive=60)
+            self.mqtt_client.connect_async(broker_host, broker_port, keepalive=60)
             self.mqtt_client.loop_start()
-            logger.info("MQTT loop started successfully")
+            logger.info("MQTT background loop started with auto-reconnection")
         except Exception as e:
-            logger.warning(f"Could not connect to MQTT broker ({e}). Will retry automatically when available.")
+            logger.warning(f"Could not initialize MQTT client ({e})")
 
     def stop_mqtt(self):
         if self.mqtt_client:
