@@ -57,4 +57,5 @@ Develop a complete industrial condition monitoring system for test rigs and rota
 - **Microcontroller Flash Permanence**: The Seeed Studio XIAO already has the active sketch flashed in its non-volatile memory. Do NOT ask the user to re-flash or re-verify unless firmware changes are explicitly required. Simply plugging in the USB cable starts telemetry.
 - **Single Source of Truth**: All AI Agents must consult this file and `PROJECT_PLAN.md` before writing code to prevent hallucinations, redundant systems, or ghost assets.
 - **No Destructive Overwrites**: Preserve existing working React components, Vanilla CSS design tokens, and authentication states.
+- **Daily Excel & Thesis Changelog**: Keep `docs/DEVELOPMENT_LOG.xlsx` and `docs/DEVELOPMENT_LOG.csv` updated after each milestone (tracking Date, Section, What Was Removed, What Was Added/Updated, and Thesis Context) for ongoing master thesis documentation.
 - **Industrial Design Standard**: Clean, professional UI. No emojis before headings.
