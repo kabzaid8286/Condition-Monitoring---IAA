@@ -13,11 +13,27 @@ echo "=================================================="
 
 # 1. Start Docker Containers (TimescaleDB, Mosquitto MQTT, Redis)
 echo ""
-echo "[1/3] 🐳 Ensuring Docker containers are running..."
+echo "[1/4] 🐳 Ensuring Docker Desktop is running..."
 if ! command -v docker &> /dev/null; then
-    echo "⚠️  Docker is not installed or not in PATH. Please start Docker Desktop."
+    echo "⚠️  Docker is not installed or not in PATH. Please install Docker."
 else
+    # Auto-launch Docker Desktop on macOS if not running
+    if ! docker info &> /dev/null; then
+        echo "⏳ Docker Desktop is closed. Launching Docker application..."
+        open -a Docker 2>/dev/null || open -a "Docker Desktop" 2>/dev/null
+        echo -n "Waiting for Docker daemon to become ready"
+        while ! docker info &> /dev/null; do
+            echo -n "."
+            sleep 2
+        done
+        echo ""
+        echo "✅ Docker daemon is ready!"
+    fi
     docker compose up -d
+    # Wait briefly for Mosquitto port 1883 to accept connections
+    while ! nc -z localhost 1883 &> /dev/null; do
+        sleep 1
+    done
 fi
 
 # 2. Function to clean up background processes on Ctrl+C

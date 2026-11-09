@@ -284,12 +284,15 @@ def main():
     client.on_connect = on_connect
 
     print(f"🔌 Connecting to MQTT Broker at {args.host}:{args.port}...")
-    try:
-        client.connect(args.host, args.port, keepalive=60)
-        client.loop_start()
-    except Exception as e:
-        print(f"⚠️ Connection error: {e}")
-        print("💡 Make sure Mosquitto container is running (docker compose up -d)")
+    connected = False
+    while not connected:
+        try:
+            client.connect(args.host, args.port, keepalive=60)
+            client.loop_start()
+            connected = True
+        except Exception as e:
+            print(f"⚠️ Waiting for Mosquitto broker ({e}). Retrying in 2s...")
+            time.sleep(2)
 
     # Dispatch to Bluetooth Low Energy async mode
     if args.mode == "ble":

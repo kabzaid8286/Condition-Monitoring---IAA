@@ -4,8 +4,10 @@ Condition Monitoring App — IAA / HS Aalen
 """
 
 import json
+import time
 import asyncio
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Dict, Set, Any
 import paho.mqtt.client as mqtt
@@ -116,13 +118,22 @@ class TelemetryHub:
 
         self.mqtt_client.on_connect = on_connect
         self.mqtt_client.on_disconnect = on_disconnect
+        self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=10)
 
-        try:
-            self.mqtt_client.connect_async(broker_host, broker_port, keepalive=60)
-            self.mqtt_client.loop_start()
-            logger.info("MQTT background loop started with auto-reconnection")
-        except Exception as e:
-            logger.warning(f"Could not initialize MQTT client ({e})")
+        def connection_worker():
+            connected = False
+            while not connected:
+                try:
+                    self.mqtt_client.connect(broker_host, broker_port, keepalive=60)
+                    self.mqtt_client.loop_start()
+                    connected = True
+                    logger.info("MQTT connection established and background loop running")
+                except Exception as e:
+                    logger.warning(f"Waiting for Mosquitto broker ({e}). Retrying in 2s...")
+                    time.sleep(2)
+
+        thread = threading.Thread(target=connection_worker, daemon=True)
+        thread.start()
 
     def stop_mqtt(self):
         if self.mqtt_client:
