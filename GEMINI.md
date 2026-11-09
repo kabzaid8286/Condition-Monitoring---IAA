@@ -48,7 +48,12 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Deploy frontend to Vercel/Cloudflare edge.
   - Containerize backend stack for cloud hosting.
 
-## 5. Development & Safety Rules
+## 5. Development & Safety Rules (Antigravity v5.5 Protocol)
+- **Pre-flight Code Inspection**: Always inspect the existing codebase before proposing or writing changes. Never guess file contents or assumptions.
+- **Zero Bloat & Zero Duplicate Code**: Strictly forbid temporary buffer code, duplicate state handlers, or verbose boilerplates. Write short, surgical, high-precision code only.
+- **No Bluffing & Explicit Confirmation**: Never hallucinate; ground all findings in live tool output. Always ask for user confirmation before executing structural or architectural changes.
+- **Continuous Hard-Saving (Git & Memory)**: Always persist milestone progress into Git commits and update `GEMINI.md` / `PROJECT_PLAN.md` so state is permanently preserved across sessions without re-explaining.
+- **Token Efficiency**: Do not redundantly reread large files or re-scan directories repeatedly. Protect token bandwidth with targeted, minimal operations.
 - **Microcontroller Flash Permanence**: The Seeed Studio XIAO already has the active sketch flashed in its non-volatile memory. Do NOT ask the user to re-flash or re-verify unless firmware changes are explicitly required. Simply plugging in the USB cable starts telemetry.
 - **Single Source of Truth**: All AI Agents must consult this file and `PROJECT_PLAN.md` before writing code to prevent hallucinations, redundant systems, or ghost assets.
 - **No Destructive Overwrites**: Preserve existing working React components, Vanilla CSS design tokens, and authentication states.
