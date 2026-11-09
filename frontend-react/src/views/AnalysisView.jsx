@@ -5,7 +5,7 @@ import '../components/charts/ChartConfig';
 
 export default function AnalysisView({ data, activeAsset }) {
   const { assets } = useAssets();
-  const asset = assets[activeAsset] || assets['test-rig-a'];
+  const asset = assets[activeAsset] || Object.values(assets)[0] || { name: 'Sensor Standby', label: 'Rotational Asset' };
 
   const stats = useMemo(() => {
     if (!data || !data.vibX) return null;

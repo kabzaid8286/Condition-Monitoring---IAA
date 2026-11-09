@@ -48,7 +48,7 @@ function getInitialDataBuffer(assetId) {
   return { labels, vibX, vibY, vibZ, temp, rpm };
 }
 
-export default function useSensorData(activeAsset = 'test-rig-a') {
+export default function useSensorData(activeAsset = '') {
   const { assets, autoRegisterSensor } = useAssets();
 
   // Per-asset tracking maps

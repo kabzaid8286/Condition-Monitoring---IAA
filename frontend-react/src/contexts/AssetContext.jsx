@@ -168,9 +168,6 @@ export const AssetProvider = ({ children }) => {
   }, []);
 
   const removeAsset = useCallback((id) => {
-    // Prevent removing the primary test-rig-a
-    if (id === 'test-rig-a') return;
-
     setAssets(prev => {
       const copy = { ...prev };
       delete copy[id];

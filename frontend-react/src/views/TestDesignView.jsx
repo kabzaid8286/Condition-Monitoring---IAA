@@ -103,15 +103,11 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
   };
 
   const handleDelete = (id) => {
-    if (id === 'test-rig-a') {
-      toast('Primary Test Rig A cannot be deleted.', 'error');
-      return;
-    }
-
     const assetToDelete = assets[id];
     removeAsset(id);
     if (activeAsset === id && setActiveAsset) {
-      setActiveAsset('test-rig-a');
+      const remaining = Object.keys(assets).filter(k => k !== id);
+      setActiveAsset(remaining[0] || '');
     }
     toast(`${assetToDelete ? assetToDelete.name : 'Sensor'} removed successfully.`, 'error');
   };
@@ -223,9 +219,6 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{a.name}</span>
-                                {id === 'test-rig-a' && (
-                                  <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.2)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>Primary Node</span>
-                                )}
                                 {a.isAutoDetected && (
                                   <span style={{ fontSize: '10px', background: 'rgba(16,185,129,0.2)', color: '#34d399', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>Auto-Discovered</span>
                                 )}
@@ -261,15 +254,13 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
                               </button>
                             )}
 
-                            {id !== 'test-rig-a' && (
-                              <button 
-                                type="button" 
-                                onClick={() => handleDelete(id)}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                              >
-                                <Trash2 size={13} /> Delete
-                              </button>
-                            )}
+                            <button 
+                              type="button" 
+                              onClick={() => handleDelete(id)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
                           </div>
                         </div>
                       )}

@@ -8,15 +8,7 @@
  * feeds, and FFT spectra strictly drop to 0.00 / standby.
  */
 
-export const ASSETS = {
-  'test-rig-a': { 
-    name: 'Test Rig A', 
-    label: 'Drive Train / Test Rig', 
-    basevib: 0, 
-    basetemp: 0, 
-    baserpm: 0 
-  },
-};
+export const ASSETS = {};
 
 export const ML_MODELS = {
   lstm: {

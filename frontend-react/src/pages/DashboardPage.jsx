@@ -12,14 +12,23 @@ import TestDesignView from '../views/TestDesignView';
 import AnalysisView from '../views/AnalysisView';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import useSensorData from '../hooks/useSensorData';
+import { useAssets } from '../contexts/AssetContext';
 
 export default function DashboardPage({ userRole, onLogout }) {
+  const { assets } = useAssets();
+  const assetKeys = Object.keys(assets);
+
   const [activeView, setActiveView] = useState(() => {
     return localStorage.getItem('condition_monitoring_active_view') || 'overview';
   });
-  const [activeAsset, setActiveAsset] = useState(() => {
-    return localStorage.getItem('condition_monitoring_active_asset') || 'test-rig-a';
+  const [selectedAsset, setSelectedAsset] = useState(() => {
+    const saved = localStorage.getItem('condition_monitoring_active_asset');
+    return saved && saved !== 'test-rig-a' ? saved : '';
   });
+
+  const activeAsset = (selectedAsset && assets[selectedAsset]) 
+    ? selectedAsset 
+    : (assetKeys[0] || '');
 
   const handleSelectView = (newView) => {
     setActiveView(newView);
@@ -31,7 +40,7 @@ export default function DashboardPage({ userRole, onLogout }) {
   };
 
   const handleSelectAsset = (newAsset) => {
-    setActiveAsset(newAsset);
+    setSelectedAsset(newAsset);
     try {
       localStorage.setItem('condition_monitoring_active_asset', newAsset);
     } catch (e) {

@@ -18,9 +18,7 @@ class TelemetryHub:
 
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
-        self.latest_readings: Dict[str, Dict[str, Any]] = {
-            "test-rig-a": {"asset_id": "test-rig-a", "vibX": 0.0, "vibY": 0.0, "temp": 0.0, "rpm": 0.0, "battery_pct": 0, "burst_state": "offline", "time": datetime.now(timezone.utc).isoformat()}
-        }
+        self.latest_readings: Dict[str, Dict[str, Any]] = {}
         self.mqtt_client: mqtt.Client = None
         self._loop = None
 

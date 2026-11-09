@@ -87,7 +87,7 @@ function formatMessageText(text) {
   return <div dangerouslySetInnerHTML={{ __html: formatted }} />;
 }
 
-export default function AiAssistantView({ activeAsset = 'test-rig-a', kpis = {}, isConnected = false }) {
+export default function AiAssistantView({ activeAsset = '', kpis = {}, isConnected = false }) {
   const { assets } = useAssets();
   const assetName = assets[activeAsset]?.name || 'Test Rig A';
   const now = () => new Date().toLocaleTimeString('en-GB');

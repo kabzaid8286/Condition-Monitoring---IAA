@@ -3,15 +3,14 @@ import { Line } from 'react-chartjs-2';
 import { useAssets } from '../contexts/AssetContext';
 import '../components/charts/ChartConfig';
 
-export default function ComparisonView({ data: activeData = {}, isConnected = false, activeAsset = 'test-rig-a' }) {
+export default function ComparisonView({ data: activeData = {}, isConnected = false, activeAsset = '' }) {
   const { assets } = useAssets();
 
-  const assetColors = {
-    'test-rig-a': '#3b82f6',
-    'test-rig-b': '#10b981',
-    'motor-01': '#f59e0b',
-    'gearbox-02': '#f43f5e'
-  };
+  const palette = ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#a855f7', '#06b6d4'];
+  const assetColors = {};
+  Object.keys(assets).forEach((key, idx) => {
+    assetColors[key] = palette[idx % palette.length];
+  });
 
   // Helper to retrieve recorded historical points for an asset or zeros
   const getAssetReadings = (key, count = 20) => {

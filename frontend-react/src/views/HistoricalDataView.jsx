@@ -3,7 +3,7 @@ import { Line } from 'react-chartjs-2';
 import { commonOptions } from '../components/charts/ChartConfig';
 import { ANOMALY_EVENTS } from '../data/systemConfig';
 
-export default function HistoricalDataView({ data, activeAsset = 'test-rig-a' }) {
+export default function HistoricalDataView({ data, activeAsset = '' }) {
   const [timeRange, setTimeRange] = useState('7D');
   const [histData, setHistData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);

@@ -55,9 +55,13 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data, kp
       <div style={{display: "flex", alignItems: "center", gap: "10px", flex: 1}}>
         <div className="asset-select-wrapper">
           <select className="asset-select" value={activeAsset} onChange={(e) => setActiveAsset(e.target.value)}>
-            {Object.entries(assets).map(([id, asset]) => (
-              <option key={id} value={id}>{asset.name} — {asset.label}</option>
-            ))}
+            {Object.keys(assets).length === 0 ? (
+              <option value="">Awaiting Hardware Sensors...</option>
+            ) : (
+              Object.entries(assets).map(([id, asset]) => (
+                <option key={id} value={id}>{asset.name} — {asset.label}</option>
+              ))
+            )}
           </select>
         </div>
         <div className={`status-pill ${connectionMode === 'offline' ? 'warn' : 'ok'}`}>

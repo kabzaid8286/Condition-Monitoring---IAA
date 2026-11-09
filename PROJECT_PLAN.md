@@ -45,6 +45,8 @@
 - [x] **Microcontroller Flash Permanence**: Verified code retention across power cycles; sensors start transmitting wirelessly upon coin-cell battery insertion.
 - [x] **Physical Sensor Verification**: Verified live streaming with physical coin-cell node `IAA-xiao-bafdedc8` (`Sensor Node (BAFDEDC8)`).
 - [x] **Automation & Clean Auth**: Integrated BLE daemon into `start.sh` / `stop.sh` and set default clean login screen display.
+- [x] **Purge Mock Defaults**: Purged `test-rig-a` and mock data entirely; live stream defaults dynamically to discovered hardware nodes (e.g. `Sensor Node (BAFDEDC8)`).
+- [ ] **Backlog Feature**: Auto-focus switcher on newly discovered live sensor streams (saved for future phase).
 
 ## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
 *Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*
@@ -57,7 +59,8 @@
 *Goal: Transition from baseline anomaly rules to automated ML inference on live telemetry batches.*
 - [ ] Configure Celery background workers connected to Redis task broker.
 - [ ] Implement inference worker for LSTM Autoencoder (unsupervised reconstruction error anomaly detection).
-- [ ] Implement XGBoost classifier for multi-fault identification (Bearing Defect, Misalignment, Imbalance, Looseness).
+- [ ] Implement XGBoost classifier for multi-fault identification (Bearing Defect
+, Misalignment, Imbalance, Looseness).
 - [ ] Compute Remaining Useful Life (RUL) estimation curve based on degradation trajectory.
 - [ ] Stream ML predictions and trigger automated alerts in TimescaleDB and the React UI.
 
