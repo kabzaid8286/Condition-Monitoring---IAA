@@ -32,7 +32,9 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Microcontroller Flash Permanence: Sketch runs permanently from flash memory; coin-cell battery power enables 100% cable-free transmission.
   - Multi-Node BLE Ingestion Daemon: `gateway/rpi_publisher.py` concurrently discovers, connects to, and streams from multiple Seeed Studio XIAO sensor nodes (`IAA-*`) simultaneously using asynchronous client pooling.
   - Verified live physical sensor streaming with hardware node `IAA-xiao-bafdedc8` (`Sensor Node (BAFDEDC8)`) delivering real-time dual-axis vibration, temperature, and RPM telemetry.
-  - Integrated BLE gateway lifecycle management into `start.sh` and `stop.sh`.
+  - Purged `test-rig-a` and all mock data; dashboard defaults dynamically to discovered hardware sensors.
+  - Verified complete physical lifecycle: battery connection auto-detection, battery disconnect zero-isolation, Test Design soft-delete persistence, and automatic resurrection upon battery re-insertion.
+  - Integrated full-stack lifecycle into `./start.sh` and `./stop.sh` with 100% offline-ready local network execution.
   - Restored clean default login view (`useState(false)`) without storage sync conflicts.
 
 ## 4. Current Phase & Next Milestones
