@@ -73,7 +73,7 @@ class TelemetryHub:
             else:
                 vx = raw_vx
                 vy = float(sensors.get("vibration_y", 0.0))
-                ax = float(sensors.get("accel_x", 0.0))
+                ax = float(sensors.get("ax", 0.0))
                 ay = float(sensors.get("accel_y", 0.0))
                 tp = raw_temp
                 rp = float(sensors["rpm"]) if "rpm" in sensors else 0.0

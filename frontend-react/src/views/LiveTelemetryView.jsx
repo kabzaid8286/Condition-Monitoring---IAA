@@ -234,7 +234,7 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
   // If disconnected, chart flatlines to zero
   const vibX = isLive ? rawVibX : rawVibX.map(() => '0.0000');
   const vibY = isLive ? rawVibY : rawVibY.map(() => '0.0000');
-  const accelX = isLive ? rawAccelX : rawAccelX.map(() => '0.00');
+  const accelX = isLive ? rawAccelX : rawAccelX.map(() => '0.0000');
   const temp = isLive ? rawTemp : rawTemp.map(() => '0.0');
   const rpm = isLive ? rawRpm : rawRpm.map(() => 0);
 
@@ -259,7 +259,7 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
       },
       {
         label: 'Accel X (m/s²)',
-        data: accelX.map(a => parseFloat(a || 0).toFixed(2)),
+        data: accelX.map(a => parseFloat(a || 0).toFixed(4)),
         borderColor: '#a855f7',
         borderWidth: 2,
         tension: 0.4,

@@ -4,7 +4,7 @@ import { useAssets } from '../contexts/AssetContext';
 // Default offline state: all gauges and live values zero / null
 export const OFFLINE_KPIS = {
   vibRms: '0.0000',
-  accelRms: '0.00',
+  accelRms: '0.0000',
   temp: '0.0',
   rpm: 0,
   health: '--',
@@ -187,8 +187,8 @@ export default function useSensorData(activeAsset = '') {
               const vx = rawVx.toFixed(4);
               const vy = rawVy.toFixed(4);
               const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(4) : (rawVy * 0.85).toFixed(4);
-              const ax = rawAx.toFixed(2);
-              const ay = rawAy.toFixed(2);
+              const ax = rawAx.toFixed(4);
+              const ay = rawAy.toFixed(4);
               const tp = rawTp.toFixed(1);
               const rp = rawRp;
 

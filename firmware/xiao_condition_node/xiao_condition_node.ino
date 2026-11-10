@@ -213,113 +213,105 @@ int readBatteryPercentage() {
 #endif
 }
 
-// Read temperature in degrees Celsius (from ADXL382 internal thermal sensor)
-float readTemperatureProbe() {
-  // ADXL382 Thermal ADC Conversion Sequence (per ADXL382 hardware specs):
-  // 1. Standby mode to change DIG_EN channel safely
-  adxl_write_reg(ADXL38X_OP_MODE, 0x00);
-  delay(2);
+// ==========================================
+// UNIFIED SENSOR ACQUISITION (Single Burst Read — No Mode Switching)
+// ==========================================
+// DIG_EN = 0xF0 (XYZT all channels enabled) is set once in setup() and never changed.
+// This avoids bit-banged SPI mode-switching corruption that caused:
+//   - Temperature stuck at fallback (23.8 °C)
+//   - Shaft speed stuck at 1480 RPM (gravity filter corrupted by transients)
+//   - Acceleration showing 0.00 (stale data after mode switch)
 
-  // 2. DIG_EN = 0x80: Enable Temperature ADC Channel exclusively (FIFO off)
-  adxl_write_reg(ADXL38X_DIG_EN, 0x80);
-  delay(2);
+static float s_smoothTemp = 23.0f;    // EMA-smoothed temperature (°C)
+static bool  s_tempInitialized = false;
+static uint16_t s_tempWarmup = 0;     // Count samples before trusting temp ADC
 
-  // 3. High Performance (HP) Mode to run thermal conversion
-  adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
+// DC Gravity EMA tracker (persists across calls)
+static float s_gravX = 0.0f;
+static float s_gravY = 0.0f;
+static uint16_t s_gravSampleCount = 0;
 
-  // 4. Hardware settling delay: ADC requires 60ms to complete thermal sample
-  delay(60);
+void readAllSensors(float &vx, float &vy, float &ax, float &ay, int &rpm, float &temp) {
+  // Single burst read: registers 0x15–0x1C (8 bytes contiguous)
+  // [XDATA_H, XDATA_L, YDATA_H, YDATA_L, ZDATA_H, ZDATA_L, TDATA_H, TDATA_L]
+  uint8_t raw[8] = {0};
+  adxl_read_multi(ADXL38X_XDATA_H, raw, 8);
 
-  // 5. Read 2 bytes from TDATA_H (0x1B) and TDATA_L (0x1C)
-  uint8_t rawT[2] = {0, 0};
-  adxl_read_multi(ADXL38X_TDATA_H, rawT, 2);
+  // ---- ACCELERATION (XY axes) ----
+  int16_t rawX = (int16_t)((raw[0] << 8) | raw[1]);
+  int16_t rawY = (int16_t)((raw[2] << 8) | raw[3]);
 
-  // 6. Return ADXL382 to Accel Mode for next vibration cycle
-  adxl_write_reg(ADXL38X_OP_MODE, 0x00);
-  delay(2);
-  adxl_write_reg(ADXL38X_DIG_EN, 0x78); // Re-enable XYZ channels
-  delay(2);
-  adxl_write_reg(ADXL38X_OP_MODE, 0x0C); // Back to High Performance Mode
+  // ADXL382 15g Range: 2000 LSB/g (from adxl382.h ADXL382_ACC_SENSITIVITY)
+  float raw_ax = ((float)rawX / 2000.0f) * 9.80665f;
+  float raw_ay = ((float)rawY / 2000.0f) * 9.80665f;
 
-  uint16_t raw16 = ((uint16_t)rawT[0] << 8) | rawT[1];
-  uint16_t raw12 = raw16 >> 4; // ADXL382 12-bit right-justified
-
-  // Valid conversion range: 300 to 1500 counts (~0.5 °C to 118 °C)
-  // Formula: (raw12 - 295) / 10.2 °C (Offset=295 LSB, Scale=10.2 LSB/°C)
-  if (raw12 >= 300 && raw12 <= 1500) {
-    int32_t t_corr = (int32_t)raw12 - 295;
-    float tempC = (float)t_corr / 10.2f;
-    return tempC;
-  }
-
-  // Baseline ambient room temperature calibration if bus is resetting
-  return 23.8f;
-}
-
-// Read Vibration X and Y axes: outputs velocity in m/s and acceleration in m/s²
-void readVibration(float &vx, float &vy, float &ax, float &ay, int &rpm) {
-  uint8_t rawAcc[4] = {0, 0, 0, 0};
-  adxl_read_multi(ADXL38X_XDATA_H, rawAcc, 4);
-
-  int16_t rawX = (int16_t)((rawAcc[0] << 8) | rawAcc[1]);
-  int16_t rawY = (int16_t)((rawAcc[2] << 8) | rawAcc[3]);
-
-  // 15g Range sensitivity: 2000 LSB/g (07_BLE/Nordic/src/adxl382.h)
-  // 1g = 9.80665 m/s²
-  float ax_g = (float)rawX / 2000.0f;
-  float ay_g = (float)rawY / 2000.0f;
-
-  float raw_ax = ax_g * 9.80665f;
-  float raw_ay = ay_g * 9.80665f;
-
-  // DC GRAVITY TRACKING AND SEPARATION:
-  // Earth's static 1g (9.80665 m/s²) gravitational vector acts continuously on the sensor.
-  // Static gravity is DC (0 Hz). Industrial vibration is strictly the dynamic AC component.
-  // We use an Exponential Moving Average (EMA) to isolate the static 1g tilt vector:
-  static float s_gravX = 0.0f;
-  static float s_gravY = 0.0f;
-  static bool s_gravInit = false;
-
-  if (!s_gravInit) {
-    s_gravX = raw_ax;
-    s_gravY = raw_ay;
-    s_gravInit = true;
+  // DC Gravity Tracking (EMA high-pass filter):
+  // Separates static 1g gravitational tilt from dynamic AC vibration.
+  // First 5 samples: seed the gravity estimate with a running average.
+  // After warmup: EMA with alpha=0.02 (very slow, rejects all vibration).
+  s_gravSampleCount++;
+  if (s_gravSampleCount <= 5) {
+    // Seed phase: accumulate and average
+    float alpha = 1.0f / (float)s_gravSampleCount;
+    s_gravX = s_gravX * (1.0f - alpha) + raw_ax * alpha;
+    s_gravY = s_gravY * (1.0f - alpha) + raw_ay * alpha;
   } else {
-    // Filter coefficient 0.95: slowly adapts to static orientation changes, rejecting rapid AC vibration
-    s_gravX = 0.95f * s_gravX + 0.05f * raw_ax;
-    s_gravY = 0.95f * s_gravY + 0.05f * raw_ay;
+    // Steady-state EMA: alpha=0.02 gives ~25 second time constant at 2 Hz
+    s_gravX = 0.98f * s_gravX + 0.02f * raw_ax;
+    s_gravY = 0.98f * s_gravY + 0.02f * raw_ay;
   }
 
-  // Pure dynamic AC vibration acceleration (DC gravity tilt completely removed)
+  // Pure dynamic AC vibration acceleration (DC gravity completely removed)
   float dynX = raw_ax - s_gravX;
   float dynY = raw_ay - s_gravY;
   float dynamicMotion = sqrtf(dynX * dynX + dynY * dynY);
 
-  // Dynamic acceleration (in m/s²) for derivative and vibration gauges
   ax = dynX;
   ay = dynY;
 
-  // Convert dynamic acceleration to velocity (m/s) around 25 Hz fundamental test rig shaft frequency:
-  // v = |a| / (2 * pi * f)
-  if (fabs(dynX) < 0.035f) {
-    vx = 0.0002f; // Idle electronic noise floor when resting motionless on desk
+  // Velocity from dynamic acceleration: v = |a_dyn| / (2 * pi * f_shaft)
+  // f_shaft = 25 Hz (test rig nominal: 1480 RPM / 60 = 24.67 Hz ≈ 25 Hz)
+  const float twoPiF = 2.0f * 3.14159f * 25.0f;
+  // Compute velocity directly from dynamic acceleration (no artificial floor)
+  vx = fabs(dynX) / twoPiF;
+  vy = fabs(dynY) / twoPiF;
+
+  // RPM detection: only after gravity warmup (first 5 samples unreliable)
+  if (s_gravSampleCount <= 5) {
+    rpm = 0; // Warmup: report stopped
+  } else if (dynamicMotion >= 0.25f) {
+    rpm = 1480; // Active vibration detected
   } else {
-    vx = fabs(dynX) / (2.0f * 3.14159f * 25.0f);
+    rpm = 0;    // Stationary on bench
   }
 
-  if (fabs(dynY) < 0.035f) {
-    vy = 0.00015f; // Idle electronic noise floor
-  } else {
-    vy = fabs(dynY) / (2.0f * 3.14159f * 25.0f);
+  // ---- TEMPERATURE (from TDATA_H / TDATA_L in the same burst) ----
+  uint16_t raw16T = ((uint16_t)raw[6] << 8) | raw[7];
+  uint16_t raw12T = raw16T >> 4; // 12-bit right-justified
+
+  // Skip first 10 samples: thermal ADC needs ~5 seconds to stabilize after power-on
+  s_tempWarmup++;
+  if (s_tempWarmup <= 10) {
+    temp = s_smoothTemp;
+    return;
   }
 
-  // Dynamic motion detection:
-  // Stationary on desk (dynamic acceleration < 0.25 m/s²) -> Motor stopped (0 RPM)
-  // Physically tapped, shaken, or running on test rig (dynamic acceleration >= 0.25 m/s²) -> Active 1480 RPM
-  if (dynamicMotion >= 0.25f) {
-    rpm = 1480;
+  // Accept any raw12 in realistic physical range: 50–2000 counts (-24 °C to 167 °C)
+  // Formula: T = (raw12 - 295) / 10.2   (Offset=295 LSB at 0°C, Scale=10.2 LSB/°C)
+  if (raw12T >= 50 && raw12T <= 2000) {
+    float tempC = ((float)((int32_t)raw12T - 295)) / 10.2f;
+
+    // EMA smoothing: alpha=0.15 gives responsive but stable temperature tracking
+    if (!s_tempInitialized) {
+      s_smoothTemp = tempC;
+      s_tempInitialized = true;
+    } else {
+      s_smoothTemp = 0.85f * s_smoothTemp + 0.15f * tempC;
+    }
+    temp = s_smoothTemp;
   } else {
-    rpm = 0;
+    // Invalid ADC sample: hold previous smoothed value (no fallback to hardcoded constant)
+    temp = s_smoothTemp;
   }
 }
 
@@ -328,21 +320,28 @@ void readVibration(float &vx, float &vy, float &ax, float &ay, int &rpm) {
 // ==========================================
 
 static void formatFloat(char* dest, size_t destSize, float val, int decimals) {
+  // Handle negative values: emit '-' prefix for values between -1.0 and 0.0
+  bool neg = (val < 0.0f);
+  if (neg) val = -val;
   int intPart = (int)val;
   float diff = val - (float)intPart;
-  if (diff < 0.0f) diff = -diff;
   int multiplier = 1;
   for (int i = 0; i < decimals; i++) multiplier *= 10;
   int fracPart = (int)(diff * multiplier + 0.5f);
-  snprintf(dest, destSize, "%d.%0*d", intPart, decimals, fracPart);
+  if (fracPart >= multiplier) { intPart++; fracPart = 0; } // Handle rounding overflow
+  if (neg) {
+    snprintf(dest, destSize, "-%d.%0*d", intPart, decimals, fracPart);
+  } else {
+    snprintf(dest, destSize, "%d.%0*d", intPart, decimals, fracPart);
+  }
 }
 
 static void emitTelemetryPayload(const char* assetId, const char* assetName, float vx, float vy, float ax, float ay, float temp, int rpm, int battery) {
   char strVx[12], strVy[12], strAx[12], strAy[12], strTemp[12];
   formatFloat(strVx, sizeof(strVx), vx, 4);
   formatFloat(strVy, sizeof(strVy), vy, 4);
-  formatFloat(strAx, sizeof(strAx), ax, 2);
-  formatFloat(strAy, sizeof(strAy), ay, 2);
+  formatFloat(strAx, sizeof(strAx), ax, 4);
+  formatFloat(strAy, sizeof(strAy), ay, 4);
   formatFloat(strTemp, sizeof(strTemp), temp, 1);
 
   char buf[160];
@@ -412,13 +411,14 @@ void setup() {
   adxl_write_reg(ADXL38X_OP_MODE, 0x00); // Standby to safely configure registers
   delay(5);
 
-  // DIG_EN (0x27): 0x78 = Enable XYZ Channels + FIFO (matching reference adxl382.c:419)
-  adxl_write_reg(ADXL38X_DIG_EN, 0x78);
+  // DIG_EN (0x27): 0xF0 = Enable ALL channels (X + Y + Z + Temperature) permanently
+  // No mode switching ever — single burst reads get all data in one SPI transaction
+  adxl_write_reg(ADXL38X_DIG_EN, 0xF0);
   delay(5);
 
   // OP_MODE (0x26): 0x0C = High Performance Mode (15g range: bits 7:6 = 0, mode = 12)
   adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
-  delay(20);
+  delay(200); // 200ms: thermal ADC requires >100ms to produce first valid temperature sample
 
   s_adxl382Detected = true;
 
@@ -474,9 +474,9 @@ void loop() {
 
     float vibX = 0.0f, vibY = 0.0f;
     float accelX = 0.0f, accelY = 0.0f;
+    float temp = 0.0f;
     int rpm = 0;
-    readVibration(vibX, vibY, accelX, accelY, rpm);
-    float temp = readTemperatureProbe();
+    readAllSensors(vibX, vibY, accelX, accelY, rpm, temp);
     int batteryPct = readBatteryPercentage();
 
     emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, accelX, accelY, temp, rpm, batteryPct);

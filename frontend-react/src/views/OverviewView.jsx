@@ -8,6 +8,8 @@ import { ALERT_DATA } from '../data/systemConfig';
 export default function OverviewView({ kpis = {}, data = {} }) {
   const labels = data?.labels || [];
   const vibX = data?.vibX || [];
+  const vibY = data?.vibY || [];
+  const accelX = data?.accelX || [];
   const temp = data?.temp || [];
   const rpm = data?.rpm || [];
 
@@ -111,11 +113,11 @@ export default function OverviewView({ kpis = {}, data = {} }) {
             </thead>
             <tbody>
               <tr><td>Drive-End Velocity</td><td className="mono">vel_de_x</td><td className="mono font-bold">{kpis.vibRms}</td><td className="mono text-muted">m/s</td><td><span className={`health-dot ${parseFloat(kpis.vibRms || 0) > 0.0071 ? 'critical' : parseFloat(kpis.vibRms || 0) > 0.0045 ? 'warning' : 'ok'}`}></span>{parseFloat(kpis.vibRms || 0) > 0.0071 ? 'CRITICAL' : parseFloat(kpis.vibRms || 0) > 0.0045 ? 'WARNING' : 'OK'}</td><td className="mono text-muted">{now}</td></tr>
-              <tr><td>Non-Drive Velocity</td><td className="mono">vel_nde_y</td><td className="mono font-bold">{(parseFloat(kpis.vibRms || 0) * 0.55).toFixed(4)}</td><td className="mono text-muted">m/s</td><td><span className="health-dot ok"></span>OK</td><td className="mono text-muted">{now}</td></tr>
+              <tr><td>Non-Drive Velocity</td><td className="mono">vel_nde_y</td><td className="mono font-bold">{vibY.length > 0 ? vibY[vibY.length - 1] : '0.0000'}</td><td className="mono text-muted">m/s</td><td><span className="health-dot ok"></span>OK</td><td className="mono text-muted">{now}</td></tr>
+              <tr><td>Dynamic Acceleration</td><td className="mono">accel_dyn</td><td className="mono font-bold">{kpis.accelRms || '0.0000'}</td><td className="mono text-muted">m/s²</td><td><span className={`health-dot ${Math.abs(parseFloat(kpis.accelRms || 0)) > 9.8 ? 'critical' : Math.abs(parseFloat(kpis.accelRms || 0)) > 5.0 ? 'warning' : 'ok'}`}></span>{Math.abs(parseFloat(kpis.accelRms || 0)) > 9.8 ? 'CRITICAL' : Math.abs(parseFloat(kpis.accelRms || 0)) > 5.0 ? 'WARNING' : 'OK'}</td><td className="mono text-muted">{now}</td></tr>
               <tr><td>Bearing Temperature</td><td className="mono">temp_de</td><td className="mono font-bold">{kpis.temp}</td><td className="mono text-muted">°C</td><td><span className={`health-dot ${kpis.temp > 75 ? 'critical' : kpis.temp > 65 ? 'warning' : 'ok'}`}></span>{kpis.temp > 75 ? 'CRITICAL' : kpis.temp > 65 ? 'WARNING' : 'OK'}</td><td className="mono text-muted">{now}</td></tr>
-              <tr><td>Motor Temperature</td><td className="mono">temp_motor</td><td className="mono font-bold">{(kpis.temp * 1.12).toFixed(1)}</td><td className="mono text-muted">°C</td><td><span className="health-dot ok"></span>OK</td><td className="mono text-muted">{now}</td></tr>
-              <tr><td>Shaft Speed</td><td className="mono">rpm_shaft</td><td className="mono font-bold">{kpis.rpm}</td><td className="mono text-muted">RPM</td><td><span className="health-dot ok"></span>OK</td><td className="mono text-muted">{now}</td></tr>
-              <tr><td>Current (Phase A)</td><td className="mono">curr_phA</td><td className="mono font-bold">18.02</td><td className="mono text-muted">A</td><td><span className="health-dot ok"></span>OK</td><td className="mono text-muted">{now}</td></tr>
+              <tr><td>Shaft Speed</td><td className="mono">rpm_shaft</td><td className="mono font-bold">{kpis.rpm}</td><td className="mono text-muted">RPM</td><td><span className={`health-dot ${kpis.rpm > 0 ? 'ok' : 'ok'}`}></span>{kpis.rpm > 0 ? 'RUNNING' : 'STOPPED'}</td><td className="mono text-muted">{now}</td></tr>
+              <tr><td>Battery Level</td><td className="mono">bat_pct</td><td className="mono font-bold">{kpis.battery || '--'}%</td><td className="mono text-muted">%</td><td><span className={`health-dot ${(kpis.battery || 100) < 20 ? 'critical' : (kpis.battery || 100) < 50 ? 'warning' : 'ok'}`}></span>OK</td><td className="mono text-muted">{now}</td></tr>
             </tbody>
           </table>
         </div>
