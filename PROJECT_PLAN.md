@@ -55,7 +55,7 @@
 - [x] **ISO 10816 Standard Thresholds**: Updated threshold classification to ISO 10816 velocity limits (<0.0028 m/s Good, >0.0045 m/s Warning, >0.0071 m/s Critical).
 - [x] **Numerical Derivative for Acceleration**: Implemented $a = \frac{dv}{dt}$ discrete differentiation in `gateway/rpi_publisher.py` and backend, rendering dual live Acceleration ($a_x, a_y$ in $\text{m/s}^2$ and $g$) and Velocity ($v_x, v_y$ in $\text{m/s}$) gauges and multi-channel feeds.
 - [x] **12.8 kHz Sampling Rate & FFT**: Configured 12.8 kHz burst sampling capability with FFT spectrum analyzer displaying full 6.4 kHz Nyquist bandwidth and bearing defect harmonic frequency bands (BPFO, 1X, 2X, resonances).
-- [x] **ADXL382 Hardware Interface**: Upgraded firmware sketch with SPI driver for the onboard ADXL382 accelerometer and internal temperature sensor register ($0.1\,^\circ\text{C}$/LSB), eliminating synthetic sine generation and hardcoded ADC defaults.
+- [x] **ADXL382 Hardware Interface**: Reversed carrier board routing and implemented dedicated bit-banging SPI transceiver for pins D0 (SCK), D1 (MOSI), D2 (MISO), D3 (CS), with D5 load switch driven HIGH. Configured registers (DIG_EN 0xF0 for simultaneous XYZ+Temp, OP_MODE 0x0C for High Performance mode) with physics formulas (Temp offset 295 LSB, scale 10.2 LSB/°C; Accel 2000 LSB/g in 15g mode) and motion-derived RPM (0 RPM when stationary on desk), completely eliminating synthetic sine waves and static fallbacks.
 
 ## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
 *Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*
