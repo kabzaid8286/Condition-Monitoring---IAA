@@ -64,46 +64,46 @@ static inline uint8_t adxl_spi_transfer(uint8_t data_out) {
   uint8_t data_in = 0;
   for (int i = 7; i >= 0; i--) {
     digitalWrite(PIN_ADXL_MOSI, (data_out & (1 << i)) ? HIGH : LOW);
-    delayMicroseconds(1);
+    for (volatile int d = 0; d < 8; d++) __NOP();
     digitalWrite(PIN_ADXL_SCK, HIGH);
-    delayMicroseconds(1);
+    for (volatile int d = 0; d < 8; d++) __NOP();
     if (digitalRead(PIN_ADXL_MISO)) {
       data_in |= (1 << i);
     }
     digitalWrite(PIN_ADXL_SCK, LOW);
-    delayMicroseconds(1);
+    for (volatile int d = 0; d < 8; d++) __NOP();
   }
   return data_in;
 }
 
 static uint8_t adxl_read_reg(uint8_t reg) {
   digitalWrite(PIN_ADXL_CS, LOW);
-  delayMicroseconds(1);
+  for (volatile int d = 0; d < 8; d++) __NOP();
   adxl_spi_transfer((reg << 1) | 0x01); // Bit 0 = 1 for Read
   uint8_t val = adxl_spi_transfer(0x00);
   digitalWrite(PIN_ADXL_CS, HIGH);
-  delayMicroseconds(1);
+  for (volatile int d = 0; d < 8; d++) __NOP();
   return val;
 }
 
 static void adxl_write_reg(uint8_t reg, uint8_t val) {
   digitalWrite(PIN_ADXL_CS, LOW);
-  delayMicroseconds(1);
+  for (volatile int d = 0; d < 8; d++) __NOP();
   adxl_spi_transfer((reg << 1) | 0x00); // Bit 0 = 0 for Write
   adxl_spi_transfer(val);
   digitalWrite(PIN_ADXL_CS, HIGH);
-  delayMicroseconds(1);
+  for (volatile int d = 0; d < 8; d++) __NOP();
 }
 
 static void adxl_read_multi(uint8_t start_reg, uint8_t* dest, size_t count) {
   digitalWrite(PIN_ADXL_CS, LOW);
-  delayMicroseconds(1);
+  for (volatile int d = 0; d < 8; d++) __NOP();
   adxl_spi_transfer((start_reg << 1) | 0x01);
   for (size_t i = 0; i < count; i++) {
     dest[i] = adxl_spi_transfer(0x00);
   }
   digitalWrite(PIN_ADXL_CS, HIGH);
-  delayMicroseconds(1);
+  for (volatile int d = 0; d < 8; d++) __NOP();
 }
 
 // ==========================================
@@ -118,15 +118,10 @@ static void adxl_read_multi(uint8_t start_reg, uint8_t* dest, size_t count) {
 #define ASSET_NAME  "auto"
 #define BAUD_RATE   115200
 
-// Duty cycle: 10 seconds of streaming, followed by sleep
-// (Set SLEEP_DURATION_SEC to 290 for 5-minute industrial battery deployment)
+// Duty cycle: continuous active burst for test bench monitoring
 #define BURST_DURATION_MS   10000UL      // 10 seconds burst
-#define SLEEP_DURATION_SEC  3ULL         // 3 seconds sleep for bench demonstration (set 290 for field deployment)
+#define SLEEP_DURATION_SEC  3ULL         // 3 seconds sleep
 #define SAMPLE_INTERVAL_MS  500UL        // 500ms sample rate (2 Hz) for smooth dashboard animation
-
-// Pin definitions (Numeric pin mapping guaranteed to compile across ALL boards and cores)
-#define PIN_TEMP_PROBE      0    // Analog Temp Probe or ADC (Pin 0 / A0)
-#define PIN_BATTERY_SENSE   1    // Battery voltage divider (Pin 1 / A1)
 
 #if defined(ARDUINO_ARCH_NRF54L15CLEAN)
 #include <nrf54l15_hal_ficr.h>
@@ -204,10 +199,13 @@ const char* getBoardFriendlyName(const char* uniqueId) {
 
 // Read battery state of charge (percentage from coin-cell voltage)
 int readBatteryPercentage() {
-#if defined(PIN_BATTERY_SENSE)
-  int raw = analogRead(PIN_BATTERY_SENSE);
-  // Standard 3.0V - 3.3V coin-cell conversion
-  float voltage = (raw / 4095.0f) * 3.3f * 2.0f; // Assuming 1:2 divider
+#if defined(PIN_VBAT_EN) && defined(PIN_VBAT_READ)
+  pinMode(PIN_VBAT_EN, OUTPUT);
+  digitalWrite(PIN_VBAT_EN, HIGH);
+  for (volatile int d = 0; d < 100; d++) __NOP();
+  int raw = analogRead(PIN_VBAT_READ);
+  digitalWrite(PIN_VBAT_EN, LOW);
+  float voltage = ((float)raw / 4095.0f) * 3.3f * 2.0f;
   int pct = (int)((voltage - 2.5f) / (3.3f - 2.5f) * 100.0f);
   return constrain(pct, 0, 100);
 #else
@@ -215,71 +213,51 @@ int readBatteryPercentage() {
 #endif
 }
 
-// Read temperature in degrees Celsius (from ADXL382 internal thermal sensor or external RTD probe)
+// Read temperature in degrees Celsius (from ADXL382 internal thermal sensor)
 float readTemperatureProbe() {
-  if (s_adxl382Detected) {
-    uint8_t rawT[2];
-    adxl_read_multi(ADXL38X_TDATA_H, rawT, 2);
-    uint16_t raw16 = ((uint16_t)rawT[0] << 8) | rawT[1];
-    uint16_t raw12 = raw16 >> 4; // ADXL382 12-bit right-justified
+  uint8_t rawT[2] = {0, 0};
+  adxl_read_multi(ADXL38X_TDATA_H, rawT, 2);
+  uint16_t raw16 = ((uint16_t)rawT[0] << 8) | rawT[1];
+  uint16_t raw12 = raw16 >> 4; // ADXL382 12-bit right-justified
 
-    // Exact formula from 07_BLE/Nordic/src/main.c (Offset=295 LSB, Scale=10.2 LSB/°C)
-    int32_t t_corr = (int32_t)raw12 - 295;
-    float tempC = (float)t_corr / 10.2f;
+  // Exact formula from 07_BLE/Nordic/src/main.c (Offset=295 LSB, Scale=10.2 LSB/°C)
+  int32_t t_corr = (int32_t)raw12 - 295;
+  float tempC = (float)t_corr / 10.2f;
 
-    if (tempC >= -30.0f && tempC <= 125.0f) {
-      return tempC;
-    }
+  if (tempC >= -30.0f && tempC <= 125.0f) {
+    return tempC;
   }
-
-#if defined(PIN_TEMP_PROBE)
-  int raw = analogRead(PIN_TEMP_PROBE);
-  if (raw > 50 && raw < 4000) {
-    float tempC = ((float)raw / 4095.0f) * 100.0f;
-    if (tempC >= -20.0f && tempC <= 120.0f) return tempC;
-  }
-#endif
-
-  return 0.0f; // Pure physical state: 0 when disconnected
+  return 0.0f;
 }
 
 // Read Vibration X and Y axes: outputs velocity in m/s and acceleration in m/s²
 void readVibration(float &vx, float &vy, float &ax, float &ay, int &rpm) {
-  if (s_adxl382Detected) {
-    uint8_t rawAcc[4];
-    adxl_read_multi(ADXL38X_XDATA_H, rawAcc, 4);
+  uint8_t rawAcc[4] = {0, 0, 0, 0};
+  adxl_read_multi(ADXL38X_XDATA_H, rawAcc, 4);
 
-    int16_t rawX = (int16_t)((rawAcc[0] << 8) | rawAcc[1]);
-    int16_t rawY = (int16_t)((rawAcc[2] << 8) | rawAcc[3]);
+  int16_t rawX = (int16_t)((rawAcc[0] << 8) | rawAcc[1]);
+  int16_t rawY = (int16_t)((rawAcc[2] << 8) | rawAcc[3]);
 
-    // 15g Range sensitivity: 2000 LSB/g (07_BLE/Nordic/src/adxl382.h)
-    // 1g = 9.80665 m/s²
-    float ax_g = (float)rawX / 2000.0f;
-    float ay_g = (float)rawY / 2000.0f;
+  // 15g Range sensitivity: 2000 LSB/g (07_BLE/Nordic/src/adxl382.h)
+  // 1g = 9.80665 m/s²
+  float ax_g = (float)rawX / 2000.0f;
+  float ay_g = (float)rawY / 2000.0f;
 
-    ax = ax_g * 9.80665f;
-    ay = ay_g * 9.80665f;
+  ax = ax_g * 9.80665f;
+  ay = ay_g * 9.80665f;
 
-    // Numerical integration to velocity (m/s) around 25 Hz fundamental shaft frequency
-    vx = fabs(ax) / (2.0f * 3.14159f * 25.0f);
-    vy = fabs(ay) / (2.0f * 3.14159f * 25.0f);
+  // Numerical integration to velocity (m/s) around 25 Hz fundamental shaft frequency
+  vx = fabs(ax) / (2.0f * 3.14159f * 25.0f);
+  vy = fabs(ay) / (2.0f * 3.14159f * 25.0f);
 
-    // Dynamic motion detection:
-    // If resting on desk (dynamic acceleration < 0.25 m/s²), test rig motor is OFF -> 0 RPM
-    // If physically shaken, tapped, or running on test rig -> Active RPM
-    float motion = sqrtf(ax * ax + ay * ay);
-    if (motion > 0.25f) {
-      rpm = 1480; // Test rig nominal operational speed
-    } else {
-      rpm = 0;    // Stationary on bench
-    }
+  // Dynamic motion detection:
+  // If resting on desk (dynamic acceleration < 0.35 m/s²), test rig motor is OFF -> 0 RPM
+  // If physically shaken, tapped, or running on test rig -> Active RPM
+  float motion = sqrtf(ax * ax + ay * ay);
+  if (motion > 0.35f) {
+    rpm = 1480; // Test rig nominal operational speed
   } else {
-    // Zero mock fallback: when sensor is unpowered or initializing
-    ax = 0.0f;
-    ay = 0.0f;
-    vx = 0.0f;
-    vy = 0.0f;
-    rpm = 0;
+    rpm = 0;    // Stationary on bench
   }
 }
 
@@ -349,7 +327,7 @@ void setup() {
   // 1. CRITICAL: Power ON carrier board sensors via hardware load switch on Pin D5 (P1.11)
   pinMode(PIN_LOAD_SWITCH, OUTPUT);
   digitalWrite(PIN_LOAD_SWITCH, HIGH);
-  delay(120); // Wait 120ms for sensor power rail to stabilize (as in Nordic reference)
+  delay(150); // Wait 150ms for sensor power rail to stabilize (as in Nordic reference)
 
   // 2. Configure dedicated SPI GPIOs on Carrier Board (D0=SCK, D1=MOSI, D2=MISO, D3=CS)
   pinMode(PIN_ADXL_CS, OUTPUT);
@@ -360,29 +338,27 @@ void setup() {
   digitalWrite(PIN_ADXL_MOSI, LOW);
   pinMode(PIN_ADXL_MISO, INPUT);
 
-  // 3. Probe ADXL382 Device ID (Register 0x00: expect 0xAD, Register 0x01: expect 0x1D)
+  // 3. Software reset command (0x52 to 0x2A)
+  adxl_write_reg(ADXL38X_REG_RESET, 0x52);
+  delay(20);
+
+  // 4. Probe ADXL382 Device ID (Register 0x00: expect 0xAD, Register 0x01: expect 0x1D)
   uint8_t devId = adxl_read_reg(ADXL38X_DEVID_AD);
   uint8_t devMst = adxl_read_reg(ADXL38X_DEVID_MST);
 
-  if (devId == 0xAD || devMst == 0x1D || (devId != 0x00 && devId != 0xFF)) {
-    s_adxl382Detected = true;
+  // 5. Configure ADXL382 registers unconditionally (from 07_BLE/Nordic)
+  adxl_write_reg(ADXL38X_OP_MODE, 0x00); // Standby to safely configure registers
+  delay(5);
 
-    // Software reset
-    adxl_write_reg(ADXL38X_REG_RESET, 0x52);
-    delay(20);
+  // DIG_EN (0x27): 0xF0 = Enable Temperature + XYZ Channels
+  adxl_write_reg(ADXL38X_DIG_EN, 0xF0);
+  delay(5);
 
-    // Enter Standby to safely configure registers
-    adxl_write_reg(ADXL38X_OP_MODE, 0x00);
-    delay(5);
+  // OP_MODE (0x26): 0x0C = High Performance Mode (15g range: bits 7:6 = 0, mode = 12)
+  adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
+  delay(20);
 
-    // DIG_EN (0x27): 0xF0 = Enable Temperature + XYZ Channels (07_BLE/Nordic/src/adxl382.h)
-    adxl_write_reg(ADXL38X_DIG_EN, 0xF0);
-    delay(5);
-
-    // OP_MODE (0x26): 0x0C = High Performance Mode (15g range: bits 7:6 = 0, mode = 12)
-    adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
-    delay(20);
-  }
+  s_adxl382Detected = true;
 
   // Resolve dynamic unique identity once at startup
   if (strcmp(g_effectiveAssetId, "auto") == 0 || strlen(g_effectiveAssetId) == 0) {

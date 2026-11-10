@@ -47,17 +47,19 @@ export default function OverviewView({ kpis = {}, data = {} }) {
   const activeAlerts = ALERT_DATA.filter(a => !a.acked).slice(0, 3);
   const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  const isOffline = kpis?.burstState === 'offline' || (parseFloat(kpis?.vibRms || 0) === 0 && kpis?.rpm === 0);
+  // Only consider offline if burstState is explicitly offline or no telemetry has arrived
+  const isOffline = !kpis || kpis?.burstState === 'offline';
+  const isResting = !isOffline && parseFloat(kpis?.vibRms || 0) < 0.0005;
 
   return (
     <>
-      <div className="page-title">Overview <span className={`badge ${isOffline ? 'warn' : 'blue'}`} style={{fontSize:"11px", fontWeight:500}}>{isOffline ? 'Standby (0 Telemetry)' : 'Live'}</span></div>
+      <div className="page-title">Overview <span className={`badge ${isOffline ? 'warn' : 'blue'}`} style={{fontSize:"11px", fontWeight:500}}>{isOffline ? 'Standby (0 Telemetry)' : (isResting ? 'Live (Resting)' : 'Live')}</span></div>
       <div className="page-title-sub">Main system status and telemetry {isOffline ? '(Hardware Disconnected — Awaiting Telemetry)' : '(Live Stream Connected • 12.8 kHz Sampling)'}</div>
       
       <div className="overview-grid" style={{marginTop:"20px"}}>
-         <KpiCard title="Vibration RMS" value={kpis?.vibRms ?? '0.0000'} unit="m/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(vibX, '#3b82f6')} trend={isOffline ? "0.0000 • Hardware Disconnected" : "● Live Accelerometer"} trendClass={isOffline ? "neutral" : "up"} />
+         <KpiCard title="Vibration RMS" value={kpis?.vibRms ?? '0.0000'} unit="m/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(vibX, '#3b82f6')} trend={isOffline ? "0.0000 • Hardware Disconnected" : (isResting ? "● Accelerometer (Resting)" : "● Live Accelerometer")} trendClass={isOffline ? "neutral" : "up"} />
          <KpiCard title="Bearing Temp" value={kpis?.temp ?? '0.0'} unit="°C" colorClass="green" icon={<Thermometer size={18} color="#10b981" />} chartData={getSparklineData(temp, '#10b981')} trend={isOffline ? "0.0 • Sensor Offline" : "● Live Temp Probe"} trendClass={isOffline ? "neutral" : "neutral"} />
-         <KpiCard title="Shaft Speed" value={kpis?.rpm ?? 0} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(rpm, '#f59e0b')} trend={isOffline ? "0 RPM • Motor Stopped" : "● Live Speed Ingest"} trendClass={isOffline ? "neutral" : "neutral"} />
+         <KpiCard title="Shaft Speed" value={kpis?.rpm ?? 0} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(rpm, '#f59e0b')} trend={isOffline ? "0 RPM • Motor Stopped" : (kpis?.rpm === 0 ? "0 RPM • Motor Stopped" : "● Live Speed Ingest")} trendClass={isOffline ? "neutral" : "neutral"} />
          <KpiCard title="Anomaly Score" value={isOffline ? '0.00' : (parseFloat(kpis?.vibRms || 0) * 100).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(vibX.map(v => parseFloat(v || 0) * 100), '#f43f5e')} trend={isOffline ? "0.00 • Model Standby" : "● Live Anomaly Scoring"} trendClass={isOffline ? "neutral" : "down"} />
       </div>
 
