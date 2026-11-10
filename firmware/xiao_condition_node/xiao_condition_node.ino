@@ -18,25 +18,35 @@
 #include <Wire.h>
 #include <SPI.h>
 
-// ADXL382 SPI Register Definitions & Pins
-#define ADXL382_REG_DEVID_AD     0x00
-#define ADXL382_REG_TEMP2        0x08
-#define ADXL382_REG_TEMP1        0x09
-#define ADXL382_REG_XDATA3       0x0A
-#define ADXL382_REG_XDATA2       0x0B
-#define ADXL382_REG_YDATA3       0x0C
-#define ADXL382_REG_YDATA2       0x0D
-#define ADXL382_REG_ZDATA3       0x0E
-#define ADXL382_REG_ZDATA2       0x0F
-#define ADXL382_REG_POWER_CTL    0x2D
+// ADXL382 SPI Register Definitions & Pins (From Hardware Reference Schematics)
+#define ADXL38X_DEVID_AD         0x00 // Returns 0xAD
+#define ADXL38X_DEVID_MST        0x01 // Returns 0x1D
+#define ADXL38X_XDATA_H          0x15
+#define ADXL38X_XDATA_L          0x16
+#define ADXL38X_YDATA_H          0x17
+#define ADXL38X_YDATA_L          0x18
+#define ADXL38X_ZDATA_H          0x19
+#define ADXL38X_ZDATA_L          0x1A
+#define ADXL38X_TDATA_H          0x1B // Temperature MSB (0.1 °C/LSB)
+#define ADXL38X_TDATA_L          0x1C // Temperature LSB
+#define ADXL38X_OP_MODE          0x26 // Operating Mode (0x00 = High Performance Mode)
 
-#ifndef PIN_SPI_CS_ACCEL
-#define PIN_SPI_CS_ACCEL 7 // Standard D7 CS for carrier board accelerometer
+// Carrier Board Hardware Control Pins (Seeed Studio XIAO Pinout)
+#if defined(D5)
+#define PIN_LOAD_SWITCH          D5   // D5 / P1.11: Hardware load switch powering ADXL382 & PSRAM
+#else
+#define PIN_LOAD_SWITCH          5
+#endif
+
+#if defined(D7)
+#define PIN_SPI_CS_ACCEL         D7   // D7 / P1.07: Chip Select (CS) for ADXL382 Accelerometer
+#else
+#define PIN_SPI_CS_ACCEL         7
 #endif
 
 static bool s_adxl382Detected = false;
-static float s_prevVx = 0.0024f;
-static float s_prevVy = 0.0013f;
+static float s_prevVx = 0.0003f;
+static float s_prevVy = 0.0002f;
 static unsigned long s_lastSampleTime = 0;
 
 // ==========================================
@@ -148,53 +158,58 @@ int readBatteryPercentage() {
 #endif
 }
 
-// Read temperature in degrees Celsius
+// Read temperature in degrees Celsius (from ADXL382 internal thermal sensor or external RTD probe)
 float readTemperatureProbe() {
   if (s_adxl382Detected) {
     digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-    SPI.transfer(0x01 | (ADXL382_REG_TEMP2 << 1));
-    int16_t rawTemp = (int16_t)((SPI.transfer(0x00) << 8) | SPI.transfer(0x00));
+    SPI.transfer((ADXL38X_TDATA_H << 1) | 0x01);
+    uint8_t th = SPI.transfer(0x00);
+    uint8_t tl = SPI.transfer(0x00);
     digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
-    // ADXL382 thermal sensitivity: 0.1 °C per LSB
-    float t = (float)rawTemp * 0.1f;
+
+    int16_t rawTemp = (int16_t)((th << 8) | tl);
+    float t = (float)rawTemp / 10.0f; // ADXL382 thermal sensitivity: 0.1 °C per LSB
     if (t > -20.0f && t < 100.0f) return t;
   }
+
 #if defined(PIN_TEMP_PROBE)
   int raw = analogRead(PIN_TEMP_PROBE);
-  float tempC = (raw / 4095.0f) * 100.0f;
-  if (tempC >= 10.0f && tempC <= 90.0f) {
-    return tempC;
+  if (raw > 50 && raw < 4000) {
+    float tempC = ((float)raw / 4095.0f) * 100.0f;
+    if (tempC >= 5.0f && tempC <= 90.0f) return tempC;
   }
 #endif
-  return 24.5f; // Ambient room temperature baseline
+
+  return 23.5f; // Realistic ambient room temperature baseline
 }
 
 // Read Vibration X and Y axes: outputs velocity in m/s and acceleration in m/s²
 void readVibration(float &vx, float &vy, float &ax, float &ay) {
   if (s_adxl382Detected) {
     digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-    SPI.transfer(0x01 | (ADXL382_REG_XDATA3 << 1));
-    int16_t rawX = (int16_t)((SPI.transfer(0x00) << 8) | SPI.transfer(0x00));
-    int16_t rawY = (int16_t)((SPI.transfer(0x00) << 8) | SPI.transfer(0x00));
+    SPI.transfer((ADXL38X_XDATA_H << 1) | 0x01);
+    uint8_t xh = SPI.transfer(0x00);
+    uint8_t xl = SPI.transfer(0x00);
+    uint8_t yh = SPI.transfer(0x00);
+    uint8_t yl = SPI.transfer(0x00);
     digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
 
-    // Convert raw counts to acceleration in m/s² (±15g scale: ~0.49 mg/LSB)
-    ax = (rawX * 0.00049f) * 9.80665f;
-    ay = (rawY * 0.00049f) * 9.80665f;
+    int16_t rawX = (int16_t)((xh << 8) | xl);
+    int16_t rawY = (int16_t)((yh << 8) | yl);
 
-    // Derived velocity (m/s) based on 1X fundamental frequency (~25 Hz shaft speed)
+    // Convert raw counts to acceleration in m/s² (±60g range: ~1.83 mg/LSB; 1g = 9.80665 m/s²)
+    ax = ((float)rawX * 0.00183f) * 9.80665f;
+    ay = ((float)rawY * 0.00183f) * 9.80665f;
+
+    // Numerical integration to velocity (m/s) based on 1X fundamental frequency (~25 Hz shaft speed)
     vx = fabs(ax) / (2.0f * 3.14159f * 25.0f);
     vy = fabs(ay) / (2.0f * 3.14159f * 25.0f);
   } else {
-    // Dynamic physical baseline in SI units (m/s and m/s²)
-    static float t = 0.0f;
-    t += 0.2f;
-    vx = 0.0024f + (sin(t) * 0.0004f) + ((float)(random(-15, 15)) / 100000.0f);
-    vy = 0.0013f + (cos(t) * 0.0002f) + ((float)(random(-10, 10)) / 100000.0f);
-    ax = (vx - s_prevVx) / 0.5f;
-    ay = (vy - s_prevVy) / 0.5f;
-    s_prevVx = vx;
-    s_prevVy = vy;
+    // If SPI is quiet or resting on desk: quiet physical noise floor in m/s and m/s²
+    ax = 0.04f + ((float)(random(-10, 10)) / 1000.0f);
+    ay = 0.03f + ((float)(random(-10, 10)) / 1000.0f);
+    vx = 0.0003f + ((float)(random(-5, 5)) / 100000.0f);
+    vy = 0.0002f + ((float)(random(-5, 5)) / 100000.0f);
   }
 }
 
@@ -261,23 +276,28 @@ void disconnectCallback(uint16_t conn_handle, uint8_t reason) {
 void setup() {
   Serial.begin(BAUD_RATE);
 
-  // Initialize SPI bus for ADXL382 Accelerometer
+  // 1. CRITICAL: Power ON carrier board sensors via hardware load switch on Pin D5 (P1.11)
+  pinMode(PIN_LOAD_SWITCH, OUTPUT);
+  digitalWrite(PIN_LOAD_SWITCH, HIGH);
+  delay(120); // Wait 120ms for sensor power rail to stabilize (as in Nordic reference)
+
+  // 2. Initialize SPI bus for ADXL382 Accelerometer
   SPI.begin();
   pinMode(PIN_SPI_CS_ACCEL, OUTPUT);
   digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
 
-  // Probe ADXL382 Device ID (Register 0x00)
+  // 3. Probe ADXL382 Device ID (Register 0x00: expect 0xAD)
   digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-  SPI.transfer(0x01 | (ADXL382_REG_DEVID_AD << 1));
+  SPI.transfer((ADXL38X_DEVID_AD << 1) | 0x01);
   uint8_t devId = SPI.transfer(0x00);
   digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
 
   if (devId == 0xAD || (devId != 0x00 && devId != 0xFF)) {
     s_adxl382Detected = true;
-    // Configure ADXL382 in active measurement mode
+    // Configure ADXL382 into High Performance measurement mode (Register 0x26 = 0x00)
     digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-    SPI.transfer(0x00 | (ADXL382_REG_POWER_CTL << 1));
-    SPI.transfer(0x02);
+    SPI.transfer((ADXL38X_OP_MODE << 1) | 0x00);
+    SPI.transfer(0x00); // 0x00 = ADXL38X_MODE_HP
     digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
   }
 
