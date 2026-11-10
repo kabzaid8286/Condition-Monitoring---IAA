@@ -38,7 +38,7 @@ export default function HistoricalDataView({ data, activeAsset = '' }) {
   const histVibData = {
     labels: labels,
     datasets: [{
-      label: 'Vibration RMS (mm/s)',
+      label: 'Vibration RMS (m/s)',
       data: vibValues,
       borderColor: '#3b82f6',
       backgroundColor: 'rgba(59, 130, 246, 0.1)',

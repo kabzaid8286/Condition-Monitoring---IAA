@@ -117,7 +117,7 @@ export default function AiAssistantView({ activeAsset = '', kpis = {}, isConnect
 
     if (!isLive) {
       if (ql.includes('health') || ql.includes('status')) {
-        return `Diagnostic status for **${assetName}**:\n• Status: **Hardware Disconnected (Standby Mode)**\n• Vibration RMS: **0.00 mm/s**\n• Temperature: **0.0 °C**\n• Shaft Speed: **0 RPM**\n\nPlease connect the Seeed Studio XIAO sensor node to initiate live diagnostics.`;
+        return `Diagnostic status for **${assetName}**:\n• Status: **Hardware Disconnected (Standby Mode)**\n• Vibration RMS: **0.0000 m/s**\n• Temperature: **0.0 °C**\n• Shaft Speed: **0 RPM**\n\nPlease connect the Seeed Studio XIAO sensor node to initiate live diagnostics.`;
       }
       if (ql.includes('anomaly') || ql.includes('vibration')) {
         return `Sensor is currently offline. No anomalies detected while system is on standby. Connect hardware to analyze vibration spectrum.`;
@@ -132,30 +132,30 @@ export default function AiAssistantView({ activeAsset = '', kpis = {}, isConnect
     }
 
     if (ql.includes('health') || ql.includes('status')) {
-      const condition = vib > 8 ? 'Critical' : vib > 5 ? 'Warning' : 'Nominal';
-      return `Diagnostic report for **${assetName}**:\n• Operational Health: **${condition}**\n• Vibration RMS: **${vib.toFixed(2)} mm/s**\n• Bearing Temperature: **${temp.toFixed(1)} °C**\n• Shaft Speed: **${rpm} RPM**\n• Health Score: **${kpis.health || 95}%**`;
+      const condition = vib > 0.0071 ? 'Critical' : vib > 0.0045 ? 'Warning' : 'Nominal';
+      return `Diagnostic report for **${assetName}**:\n• Operational Health: **${condition}**\n• Vibration RMS: **${vib.toFixed(4)} m/s**\n• Bearing Temperature: **${temp.toFixed(1)} °C**\n• Shaft Speed: **${rpm} RPM**\n• Health Score: **${kpis.health || 95}%**`;
     }
     if (ql.includes('anomaly') || ql.includes('vibration') || ql.includes('spike')) {
-      if (vib > 5) {
-        return `⚠️ Elevated vibration detected at **${vib.toFixed(2)} mm/s** on **${assetName}**. Spectral peaks suggest possible 1X harmonic imbalance or bearing stress.`;
+      if (vib > 0.0045) {
+        return `⚠️ Elevated vibration detected at **${vib.toFixed(4)} m/s** on **${assetName}**. Spectral peaks suggest possible 1X harmonic imbalance or bearing stress.`;
       }
-      return `Vibration levels are nominal (**${vib.toFixed(2)} mm/s**). No threshold exceedances or spectral anomalies detected on **${assetName}**.`;
+      return `Vibration levels are nominal (**${vib.toFixed(4)} m/s**). No threshold exceedances or spectral anomalies detected on **${assetName}**.`;
     }
     if (ql.includes('rul') || ql.includes('remaining') || ql.includes('life')) {
-      const estimatedHours = Math.max(120, Math.round(4200 - (vib * 450)));
+      const estimatedHours = Math.max(120, Math.round(4200 - (vib * 450000)));
       return `Remaining Useful Life (RUL) estimation for **${assetName}** based on current degradation rates:\n• Estimated Bearing Life: **~${estimatedHours} operating hours**\n• Confidence Level: **94.2%**`;
     }
     if (ql.includes('maint') || ql.includes('recommend') || ql.includes('action') || ql.includes('fix')) {
-      if (vib > 7 || temp > 75) {
+      if (vib > 0.0071 || temp > 75) {
         return `Recommended Actions:\n1. Inspect Drive-End bearing lubrication\n2. Verify shaft alignment and mounting bolt torque\n3. Schedule maintenance within the next 48 operating hours`;
       }
       return `Routine maintenance: All operational metrics within ISO 10816 limits. Continue standard continuous monitoring cycle.`;
     }
     if (ql.includes('compar') || ql.includes('motor') || ql.includes('rig')) {
-      return `Active asset: **${assetName}** (Vib: ${vib.toFixed(2)} mm/s, Temp: ${temp.toFixed(1)} °C, RPM: ${rpm}).`;
+      return `Active asset: **${assetName}** (Vib: ${vib.toFixed(4)} m/s, Temp: ${temp.toFixed(1)} °C, RPM: ${rpm}).`;
     }
 
-    return `I reviewed live telemetry from **${assetName}**.\n\nCurrent status:\n• Vibration RMS: **${vib.toFixed(2)} mm/s**\n• Bearing Temperature: **${temp.toFixed(1)} °C**\n• Shaft Speed: **${rpm} RPM**\n• Hardware Status: **${isLive ? 'Online & Streaming' : 'Standby / Offline'}**\n\nTry asking about: **health status, anomalies, remaining useful life, or maintenance recommendations**.`;
+    return `I reviewed live telemetry from **${assetName}**.\n\nCurrent status:\n• Vibration RMS: **${vib.toFixed(4)} m/s**\n• Bearing Temperature: **${temp.toFixed(1)} °C**\n• Shaft Speed: **${rpm} RPM**\n• Hardware Status: **${isLive ? 'Online & Streaming' : 'Standby / Offline'}**\n\nTry asking about: **health status, anomalies, remaining useful life, or maintenance recommendations**.`;
   };
 
   const handleSend = (textToSend) => {

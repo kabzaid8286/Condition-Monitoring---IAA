@@ -62,7 +62,7 @@ export function exportPDF(data, asset = {name: 'Test Rig A', label: 'Drive Train
     
     const tableData = data.map(row => [
       row.timestamp,
-      `${row.vibration.toFixed(2)} mm/s`,
+      `${(row.vibration > 0.05 ? row.vibration / 1000 : row.vibration).toFixed(4)} m/s`,
       `${row.temp.toFixed(1)} °C`,
       row.rpm,
       row.anomaly.toFixed(2)

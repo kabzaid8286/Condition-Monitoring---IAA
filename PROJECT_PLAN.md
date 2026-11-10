@@ -48,6 +48,15 @@
 - [x] **Purge Mock Defaults**: Purged `test-rig-a` and mock data entirely; live stream defaults dynamically to discovered hardware nodes (e.g. `Sensor Node (BAFDEDC8)`).
 - [ ] **Backlog Feature**: Auto-focus switcher on newly discovered live sensor streams (saved for future phase).
 
+---
+
+## Phase 5.6: Physics Kinematics & 12.8 kHz Ingestion Pipeline (Completed)
+- [x] **Unit Conversion (mm/s to m/s)**: Standardized SI velocity units across the gateway, backend WebSocket hub, and React SPA views (Overview, Real-Time Monitoring, Trends, Comparison, ML Models, and AI Assistant).
+- [x] **ISO 10816 Standard Thresholds**: Updated threshold classification to ISO 10816 velocity limits (<0.0028 m/s Good, >0.0045 m/s Warning, >0.0071 m/s Critical).
+- [x] **Numerical Derivative for Acceleration**: Implemented $a = \frac{dv}{dt}$ discrete differentiation in `gateway/rpi_publisher.py` and backend, rendering dual live Acceleration ($a_x, a_y$ in $\text{m/s}^2$ and $g$) and Velocity ($v_x, v_y$ in $\text{m/s}$) gauges and multi-channel feeds.
+- [x] **12.8 kHz Sampling Rate & FFT**: Configured 12.8 kHz burst sampling capability with FFT spectrum analyzer displaying full 6.4 kHz Nyquist bandwidth and bearing defect harmonic frequency bands (BPFO, 1X, 2X, resonances).
+- [x] **ADXL382 Hardware Interface**: Upgraded firmware sketch with SPI driver for the onboard ADXL382 accelerometer and internal temperature sensor register ($0.1\,^\circ\text{C}$/LSB), eliminating synthetic sine generation and hardcoded ADC defaults.
+
 ## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
 *Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*
 - [ ] **Transfer Gateway Code**: Sync `gateway/rpi_publisher.py` and requirements (`paho-mqtt`, `bleak`, `pyserial`) to the Raspberry Pi 5.

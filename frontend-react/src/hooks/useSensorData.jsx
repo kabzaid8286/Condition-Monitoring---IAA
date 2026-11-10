@@ -3,12 +3,14 @@ import { useAssets } from '../contexts/AssetContext';
 
 // Default offline state: all gauges and live values zero / null
 export const OFFLINE_KPIS = {
-  vibRms: '0.00',
+  vibRms: '0.0000',
+  accelRms: '0.00',
   temp: '0.0',
   rpm: 0,
   health: '--',
   motorLoad: 0,
   battery: '--',
+  sampleRateHz: 12800,
   burstState: 'offline'
 };
 
@@ -31,6 +33,8 @@ function getInitialDataBuffer(assetId) {
   const vibX = [];
   const vibY = [];
   const vibZ = [];
+  const accelX = [];
+  const accelY = [];
   const temp = [];
   const rpm = [];
   const now = Date.now();
@@ -38,14 +42,16 @@ function getInitialDataBuffer(assetId) {
   for (let i = 19; i >= 0; i--) {
     const t = new Date(now - i * 2000);
     labels.push(t.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    vibX.push('0.00');
-    vibY.push('0.00');
-    vibZ.push('0.00');
+    vibX.push('0.0000');
+    vibY.push('0.0000');
+    vibZ.push('0.0000');
+    accelX.push('0.00');
+    accelY.push('0.00');
     temp.push('0.0');
     rpm.push(0);
   }
 
-  return { labels, vibX, vibY, vibZ, temp, rpm };
+  return { labels, vibX, vibY, vibZ, accelX, accelY, temp, rpm };
 }
 
 export default function useSensorData(activeAsset = '') {
@@ -168,6 +174,8 @@ export default function useSensorData(activeAsset = '') {
 
               const rawVx = parseFloat(item.vibX || 0);
               const rawVy = parseFloat(item.vibY || 0);
+              const rawAx = parseFloat(item.accelX || 0);
+              const rawAy = parseFloat(item.accelY || 0);
               const rawTp = parseFloat(item.temp || 0);
               const rawRp = Math.round(parseFloat(item.rpm || 0));
               const burstSt = item.burst_state || 'active';
@@ -176,9 +184,11 @@ export default function useSensorData(activeAsset = '') {
                 ? new Date(item.time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-              const vx = rawVx.toFixed(2);
-              const vy = rawVy.toFixed(2);
-              const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(2) : (rawVy * 0.85).toFixed(2);
+              const vx = rawVx.toFixed(4);
+              const vy = rawVy.toFixed(4);
+              const vz = item.vibZ !== undefined ? parseFloat(item.vibZ).toFixed(4) : (rawVy * 0.85).toFixed(4);
+              const ax = rawAx.toFixed(2);
+              const ay = rawAy.toFixed(2);
               const tp = rawTp.toFixed(1);
               const rp = rawRp;
 
@@ -190,6 +200,8 @@ export default function useSensorData(activeAsset = '') {
                 vibX: slide(existingData.vibX, vx),
                 vibY: slide(existingData.vibY, vy),
                 vibZ: slide(existingData.vibZ, vz),
+                accelX: slide(existingData.accelX || [], ax),
+                accelY: slide(existingData.accelY || [], ay),
                 temp: slide(existingData.temp, tp),
                 rpm: slide(existingData.rpm, rp)
               };
@@ -205,11 +217,13 @@ export default function useSensorData(activeAsset = '') {
 
               const nextKpis = {
                 vibRms: vx,
+                accelRms: ax,
                 temp: tp,
                 rpm: rp,
-                health: Math.max(0, Math.min(100, Math.round(100 - (parseFloat(vx) * 3.5)))),
+                health: Math.max(0, Math.min(100, Math.round(100 - (parseFloat(vx) * 3500)))),
                 motorLoad: Math.min(100, Math.round((rp / 3000) * 100)),
                 battery: item.battery_pct !== undefined ? item.battery_pct : 98,
+                sampleRateHz: item.sample_rate_hz || 12800,
                 burstState: burstSt
               };
 

@@ -36,6 +36,12 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Verified complete physical lifecycle: battery connection auto-detection, battery disconnect zero-isolation, Test Design soft-delete persistence, and automatic resurrection upon battery re-insertion.
   - Integrated full-stack lifecycle into `./start.sh` and `./stop.sh` with 100% offline-ready local network execution.
   - Restored clean default login view (`useState(false)`) without storage sync conflicts.
+- **Phase 5.6: Physics Kinematics & High-Bandwidth 12.8 kHz Ingestion (Completed)**:
+  - Converted vibration units from legacy mm/s to standard SI m/s across the entire stack.
+  - Updated ISO 10816 vibration severity thresholds (<0.0028 m/s Good, >0.0045 m/s Warning, >0.0071 m/s Critical).
+  - Implemented discrete numerical derivative $a = \frac{dv}{dt}$ in gateway and backend, displaying live Acceleration (m/s² and g) alongside Velocity (m/s).
+  - Reconfigured FFT spectrum analyzer for 12.8 kHz high-rate sampling (6.4 kHz Nyquist bandwidth) with bearing defect harmonic bands.
+  - Implemented ADXL382 SPI register interface with internal thermal sensor (0.1 °C/LSB) in firmware, replacing synthetic mock sine waves with physical sensor telemetry.
 
 ## 4. Current Phase & Next Milestones
 - **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:

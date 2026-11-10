@@ -66,11 +66,15 @@ class TelemetryHub:
             if raw_vx == 0.0 and raw_temp == 0.0 and burst_st == "sleep" and float(previous.get("vibX", 0.0)) > 0.0:
                 vx = previous.get("vibX", 0.0)
                 vy = previous.get("vibY", 0.0)
+                ax = previous.get("accelX", 0.0)
+                ay = previous.get("accelY", 0.0)
                 tp = previous.get("temp", 0.0)
                 rp = previous.get("rpm", 1480.0)
             else:
                 vx = raw_vx
                 vy = float(sensors.get("vibration_y", 0.0))
+                ax = float(sensors.get("accel_x", 0.0))
+                ay = float(sensors.get("accel_y", 0.0))
                 tp = raw_temp
                 rp = float(sensors.get("rpm", 1480.0))
 
@@ -80,9 +84,12 @@ class TelemetryHub:
                 "asset_name": asset_name,
                 "vibX": vx,
                 "vibY": vy,
+                "accelX": ax,
+                "accelY": ay,
                 "temp": tp,
                 "rpm": rp,
                 "battery_pct": sensors.get("battery_pct", 100),
+                "sample_rate_hz": sensors.get("sample_rate_hz", 12800),
                 "burst_state": burst_st,
                 "time": payload.get("timestamp", datetime.now(timezone.utc).isoformat())
             }

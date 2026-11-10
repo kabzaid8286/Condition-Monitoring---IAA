@@ -32,8 +32,49 @@ DEFAULT_GATEWAY_ID = "rpi5-iaa-node-01"
 DEFAULT_BAUD_RATE = 115200
 
 ASSET_BASELINES = {
-    "test-rig-a": {"name": "Test Rig A", "basevib": 2.4, "basetemp": 45.0, "baserpm": 1480.0},
+    "test-rig-a": {"name": "Test Rig A", "basevib": 0.0024, "basetemp": 45.0, "baserpm": 1480.0},
 }
+
+# Per-sensor velocity tracking for numerical derivative (acceleration a = dv / dt)
+_velocity_history = {}
+
+def process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax=None, explicit_ay=None, sample_rate_hz=12800):
+    """
+    Standardize vibration kinematics:
+    1. Converts velocity from mm/s to m/s (if incoming value > 0.05, it is in mm/s -> divide by 1000).
+    2. Computes acceleration as the numerical derivative of velocity: a = dv/dt (in m/s^2).
+    3. Retains 12.8 kHz sampling rate capability metadata.
+    """
+    now = time.time()
+    
+    # Unit conversion: mm/s -> m/s
+    vx_ms = (float(raw_vx) / 1000.0) if float(raw_vx) > 0.05 else float(raw_vx)
+    vy_ms = (float(raw_vy) / 1000.0) if float(raw_vy) > 0.05 else float(raw_vy)
+    
+    # Derivative of velocity with respect to time to get acceleration
+    hist = _velocity_history.get(asset_id)
+    if explicit_ax is not None and explicit_ay is not None:
+        ax = float(explicit_ax)
+        ay = float(explicit_ay)
+    elif hist:
+        dt = max(0.005, now - hist["timestamp"])
+        ax = (vx_ms - hist["vx"]) / dt
+        ay = (vy_ms - hist["vy"]) / dt
+    else:
+        # Initial estimate based on 1X harmonic acceleration: a = v * 2*pi*f (~25 Hz fundamental)
+        ax = vx_ms * 2.0 * math.pi * 25.0
+        ay = vy_ms * 2.0 * math.pi * 25.0
+        
+    _velocity_history[asset_id] = {"vx": vx_ms, "vy": vy_ms, "timestamp": now}
+    
+    return {
+        "vibration_x": round(vx_ms, 6),
+        "vibration_y": round(vy_ms, 6),
+        "accel_x": round(ax, 3),
+        "accel_y": round(ay, 3),
+        "accel_g": round(ax / 9.80665, 3),
+        "sample_rate_hz": sample_rate_hz
+    }
 
 
 def find_serial_port():
@@ -109,15 +150,25 @@ class SensorReader:
                             return sleep_reading
                         continue
 
-                    if "vibration_x" in data or "vib_x" in data:
-                        asset_id = str(data.get("asset_id") or self.asset_id).strip()
+                    if "vibration_x" in data or "vib_x" in data or "vx" in data:
+                        asset_id = str(data.get("asset_id") or data.get("id") or self.asset_id).strip()
                         asset_name = str(data.get("name") or data.get("asset_name") or asset_id.replace('-', ' ').title()).strip()
+                        raw_vx = float(data.get("vibration_x") if data.get("vibration_x") is not None else data.get("vx", data.get("vib_x", 0.0)))
+                        raw_vy = float(data.get("vibration_y") if data.get("vibration_y") is not None else data.get("vy", data.get("vib_y", 0.0)))
+                        explicit_ax = data.get("accel_x") or data.get("ax")
+                        explicit_ay = data.get("accel_y") or data.get("ay")
+                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay)
+
                         reading = {
-                            "vibration_x": float(data.get("vibration_x", data.get("vib_x", 0.0))),
-                            "vibration_y": float(data.get("vibration_y", data.get("vib_y", 0.0))),
-                            "temperature": float(data.get("temperature", data.get("temp", 0.0))),
+                            "vibration_x": kinematics["vibration_x"],
+                            "vibration_y": kinematics["vibration_y"],
+                            "accel_x": kinematics["accel_x"],
+                            "accel_y": kinematics["accel_y"],
+                            "accel_g": kinematics["accel_g"],
+                            "temperature": float(data.get("temperature") if data.get("temperature") is not None else data.get("temp", data.get("t", 0.0))),
                             "rpm": float(data.get("rpm", 1480.0)),
-                            "battery_pct": int(data.get("battery_pct", data.get("battery", 100))),
+                            "battery_pct": int(data.get("battery_pct") if data.get("battery_pct") is not None else data.get("bat", data.get("battery", 100))),
+                            "sample_rate_hz": kinematics["sample_rate_hz"],
                             "burst_state": str(data.get("burst_state", "active")),
                             "_asset_id": asset_id,
                             "_asset_name": asset_name
@@ -141,17 +192,22 @@ class SensorReader:
         # Trigger occasional intermittent vibration spike for anomaly testing
         is_spike = (t % 120 >= 115)
 
-        vib_x = round(max(0.1, base["basevib"] + math.sin(t * 0.05) * 0.4 + (8.0 if is_spike else 0.0) + random.uniform(-0.15, 0.15)), 3)
-        vib_y = round(max(0.1, (base["basevib"] * 0.55) + math.cos(t * 0.04) * 0.25 + (4.5 if is_spike else 0.0) + random.uniform(-0.1, 0.1)), 3)
+        vib_x_ms = round(max(0.0001, base["basevib"] + math.sin(t * 0.05) * 0.0004 + (0.008 if is_spike else 0.0) + random.uniform(-0.00015, 0.00015)), 6)
+        vib_y_ms = round(max(0.0001, (base["basevib"] * 0.55) + math.cos(t * 0.04) * 0.00025 + (0.0045 if is_spike else 0.0) + random.uniform(-0.0001, 0.0001)), 6)
+        kinematics = process_sensor_kinematics(self.asset_id, vib_x_ms, vib_y_ms)
         temp = round(max(15.0, base["basetemp"] + math.sin(t * 0.02) * 1.5 + (2.0 if is_spike else 0.0) + random.uniform(-0.3, 0.3)), 2)
         rpm = round(max(100.0, base["baserpm"] + math.sin(t * 0.03) * 12.0 + random.uniform(-3.0, 3.0)), 1)
 
         return {
-            "vibration_x": vib_x,
-            "vibration_y": vib_y,
+            "vibration_x": kinematics["vibration_x"],
+            "vibration_y": kinematics["vibration_y"],
+            "accel_x": kinematics["accel_x"],
+            "accel_y": kinematics["accel_y"],
+            "accel_g": kinematics["accel_g"],
             "temperature": temp,
             "rpm": rpm,
             "battery_pct": 98,
+            "sample_rate_hz": kinematics["sample_rate_hz"],
             "burst_state": "active"
         }
 
@@ -193,12 +249,22 @@ async def run_ble_mode(mqtt_client, args):
 
                         asset_id = str(payload_json.get("asset_id") or payload_json.get("id") or args.asset).strip()
                         asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
+                        raw_vx = float(payload_json.get("vibration_x") if payload_json.get("vibration_x") is not None else payload_json.get("vx", payload_json.get("vib_x", 0.0)))
+                        raw_vy = float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0)))
+                        explicit_ax = payload_json.get("accel_x") or payload_json.get("ax")
+                        explicit_ay = payload_json.get("accel_y") or payload_json.get("ay")
+                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay)
+
                         readings = {
-                            "vibration_x": float(payload_json.get("vibration_x") if payload_json.get("vibration_x") is not None else payload_json.get("vx", payload_json.get("vib_x", 0.0))),
-                            "vibration_y": float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0))),
+                            "vibration_x": kinematics["vibration_x"],
+                            "vibration_y": kinematics["vibration_y"],
+                            "accel_x": kinematics["accel_x"],
+                            "accel_y": kinematics["accel_y"],
+                            "accel_g": kinematics["accel_g"],
                             "temperature": float(payload_json.get("temperature") if payload_json.get("temperature") is not None else payload_json.get("temp", payload_json.get("t", 0.0))),
                             "rpm": float(payload_json.get("rpm", 1480.0)),
                             "battery_pct": int(payload_json.get("battery_pct") if payload_json.get("battery_pct") is not None else payload_json.get("bat", payload_json.get("b", 100))),
+                            "sample_rate_hz": kinematics["sample_rate_hz"],
                             "burst_state": str(payload_json.get("burst_state", "active"))
                         }
 
@@ -214,7 +280,7 @@ async def run_ble_mode(mqtt_client, args):
                             "quality": 100
                         }
                         mqtt_client.publish(topic, json.dumps(msg), qos=0)
-                        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BLE-WIRELESS] [{asset_id} ({asset_name})] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}%")
+                        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BLE-WIRELESS] [{asset_id} ({asset_name})] VelX: {readings['vibration_x']:.4f} m/s | AccelX: {readings['accel_x']:.2f} m/s² | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}% (12.8 kHz)")
                     except Exception as err:
                         print(f"[BLE-WARN] Incomplete JSON packet ({err}): {line}")
                 else:
@@ -337,7 +403,7 @@ def main():
 
             msg_str = json.dumps(payload)
             client.publish(topic, msg_str, qos=0)
-            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{current_asset_id} ({current_asset_name})] VibX: {readings['vibration_x']:.2f} mm/s | VibY: {readings['vibration_y']:.2f} mm/s | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings.get('battery_pct', 100)}%")
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [{current_asset_id} ({current_asset_name})] VelX: {readings['vibration_x']:.4f} m/s | AccelX: {readings.get('accel_x', 0.0):.2f} m/s² | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings.get('battery_pct', 100)}% (12.8 kHz)")
 
             time.sleep(args.interval)
     except KeyboardInterrupt:

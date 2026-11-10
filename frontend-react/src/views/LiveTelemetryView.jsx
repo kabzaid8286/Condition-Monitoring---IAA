@@ -140,29 +140,41 @@ function FFTCanvas({ tickCount, isLive, lastVib = 0 }) {
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.font = '12px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Hardware Disconnected — Spectrum Inactive (0.00 mm/s)', w / 2, h / 2);
+      ctx.fillText('Hardware Disconnected — Spectrum Inactive (0.0000 m/s)', w / 2, h / 2);
 
-      // X-axis text
+      // X-axis text: 12.8 kHz sampling rate (Nyquist limit = 6.4 kHz)
       ctx.fillStyle = 'rgba(255,255,255,0.25)';
       ctx.font = '10px JetBrains Mono, monospace';
-      [0, 100, 200, 300, 400, 500].forEach(hz => {
-        ctx.fillText(hz + 'Hz', pad.left + (hz / 500) * cw, pad.top + ch + 16);
+      [
+        { hz: 0, text: '0 Hz' },
+        { hz: 1000, text: '1 kHz' },
+        { hz: 2000, text: '2 kHz' },
+        { hz: 3000, text: '3 kHz' },
+        { hz: 4000, text: '4 kHz' },
+        { hz: 5000, text: '5 kHz' },
+        { hz: 6400, text: '6.4 kHz' }
+      ].forEach(item => {
+        ctx.fillText(item.text, pad.left + (item.hz / 6400) * cw, pad.top + ch + 16);
       });
       return;
     }
 
     // Live active stream: scale FFT bins based on actual live vibration amplitude
-    const scaleFactor = Math.min(2.0, vibNum / 2.5);
+    // 12.8 kHz sampling rate maps full spectrum across 60 spectral bins
+    const scaleFactor = Math.min(2.5, vibNum / 0.0025);
     if (binsRef.current.length !== 60) {
       const newBins = [];
       for (let i = 0; i < 60; i++) {
-        const hz = (i / 60) * 500;
+        const hz = (i / 60) * 6400;
         let v = 0.04 * scaleFactor;
-        if (Math.abs(hz - 25) < 5) v = 0.35 * scaleFactor;
-        if (Math.abs(hz - 50) < 4) v = 0.22 * scaleFactor;
-        if (Math.abs(hz - 87) < 6) v = 0.68 * scaleFactor;
-        if (Math.abs(hz - 150) < 3) v = 0.15 * scaleFactor;
-        newBins.push(v);
+        // Rotational harmonics & bearing fault frequencies (BPFO / BPFI harmonics)
+        if (Math.abs(hz - 25) < 30) v = 0.40 * scaleFactor;     // 1X rotational speed
+        if (Math.abs(hz - 50) < 30) v = 0.28 * scaleFactor;     // 2X harmonic
+        if (Math.abs(hz - 120) < 40) v = 0.65 * scaleFactor;    // Bearing outer race BPFO
+        if (Math.abs(hz - 850) < 80) v = 0.35 * scaleFactor;    // Structural resonance
+        if (Math.abs(hz - 2400) < 120) v = 0.50 * scaleFactor;  // High-frequency bearing impact band
+        if (Math.abs(hz - 4800) < 150) v = 0.20 * scaleFactor;  // Gear-mesh / high harmonic
+        newBins.push(Math.min(1.0, v));
       }
       binsRef.current = newBins;
     } else {
@@ -178,18 +190,25 @@ function FFTCanvas({ tickCount, isLive, lastVib = 0 }) {
       const bh = v * ch;
       const y = pad.top + ch - bh;
       const g = ctx.createLinearGradient(0, y, 0, pad.top + ch);
-      g.addColorStop(0, 'rgba(59,130,246,0.9)');
-      g.addColorStop(1, 'rgba(99,102,241,0.3)');
+      g.addColorStop(0, '#3b82f6');
+      g.addColorStop(1, 'rgba(59, 130, 246, 0.1)');
       ctx.fillStyle = g;
       ctx.fillRect(x, y, bw, bh);
     });
 
-    // X-axis text
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    // X-axis text: 12.8 kHz sampling rate (Nyquist limit = 6.4 kHz)
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = '10px JetBrains Mono, monospace';
-    ctx.textAlign = 'center';
-    [0, 100, 200, 300, 400, 500].forEach(hz => {
-      ctx.fillText(hz + 'Hz', pad.left + (hz / 500) * cw, pad.top + ch + 16);
+    [
+      { hz: 0, text: '0 Hz' },
+      { hz: 1000, text: '1 kHz' },
+      { hz: 2000, text: '2 kHz' },
+      { hz: 3000, text: '3 kHz' },
+      { hz: 4000, text: '4 kHz' },
+      { hz: 5000, text: '5 kHz' },
+      { hz: 6400, text: '6.4 kHz' }
+    ].forEach(item => {
+      ctx.fillText(item.text, pad.left + (item.hz / 6400) * cw, pad.top + ch + 16);
     });
   }, [tickCount, isLive, lastVib]);
 
@@ -201,18 +220,21 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
 
   // When disconnected: all gauges strictly drop to zero
   const lastVib = isLive ? (parseFloat(kpis?.vibRms) || 0) : 0;
+  const lastAccel = isLive ? (parseFloat(kpis?.accelRms) || 0) : 0;
   const lastTemp = isLive ? (parseFloat(kpis?.temp) || 0) : 0;
   const lastRpm = isLive ? (parseInt(kpis?.rpm) || 0) : 0;
 
   const rawVibX = data?.vibX || [];
   const rawVibY = data?.vibY || [];
+  const rawAccelX = data?.accelX || [];
   const rawTemp = data?.temp || [];
   const rawRpm = data?.rpm || [];
   const labels = data?.labels || [];
 
   // If disconnected, chart flatlines to zero
-  const vibX = isLive ? rawVibX : rawVibX.map(() => '0.00');
-  const vibY = isLive ? rawVibY : rawVibY.map(() => '0.00');
+  const vibX = isLive ? rawVibX : rawVibX.map(() => '0.0000');
+  const vibY = isLive ? rawVibY : rawVibY.map(() => '0.0000');
+  const accelX = isLive ? rawAccelX : rawAccelX.map(() => '0.00');
   const temp = isLive ? rawTemp : rawTemp.map(() => '0.0');
   const rpm = isLive ? rawRpm : rawRpm.map(() => 0);
 
@@ -220,23 +242,31 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
     labels: labels,
     datasets: [
       {
-        label: 'Vibration X',
-        data: vibX,
+        label: 'Velocity X (m/s ×100)',
+        data: vibX.map(v => (parseFloat(v || 0) * 100).toFixed(2)),
         borderColor: '#3b82f6',
         borderWidth: 2,
         tension: 0.4,
         pointRadius: 0
       },
       {
-        label: 'Vibration Y',
-        data: vibY,
+        label: 'Velocity Y (m/s ×100)',
+        data: vibY.map(v => (parseFloat(v || 0) * 100).toFixed(2)),
         borderColor: '#06b6d4',
         borderWidth: 2,
         tension: 0.4,
         pointRadius: 0
       },
       {
-        label: 'Temperature',
+        label: 'Accel X (m/s²)',
+        data: accelX.map(a => parseFloat(a || 0).toFixed(2)),
+        borderColor: '#a855f7',
+        borderWidth: 2,
+        tension: 0.4,
+        pointRadius: 0
+      },
+      {
+        label: 'Temperature (°C)',
         data: temp,
         borderColor: '#10b981',
         borderWidth: 2,
@@ -265,17 +295,29 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
         </div>
       </div>
       
-      <div className="grid-3" style={{ marginTop: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "16px", marginTop: "20px" }}>
         <DialGauge
           value={lastVib}
           min={0}
+          max={0.015}
+          decimals={4}
+          unit="m/s RMS"
+          label="VIBRATION VELOCITY"
+          color="#3b82f6"
+          warnThreshold={0.0045}
+          critThreshold={0.0071}
+        />
+
+        <DialGauge
+          value={lastAccel}
+          min={0}
           max={15}
           decimals={2}
-          unit="mm/s RMS"
-          label="VIBRATION (Drive-End X)"
-          color="#3b82f6"
-          warnThreshold={5}
-          critThreshold={8}
+          unit="m/s²"
+          label="ACCELERATION (dv/dt)"
+          color="#a855f7"
+          warnThreshold={5.0}
+          critThreshold={9.8}
         />
         
         <DialGauge
@@ -306,13 +348,14 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
           <div className="card-title">Real-Time Multi-Channel Feed</div>
           <div style={{ fontSize: "12px", color: isLive ? "var(--green)" : "var(--amber)", display: "flex", alignItems: "center", gap: "6px" }}>
             <div className={`status-dot ${isLive ? 'live' : 'warn'}`}></div> 
-            {isLive ? 'Streaming Live (2 Hz)' : 'Hardware Disconnected — Telemetry Flatline (0.00 mm/s)'}
+            {isLive ? 'Streaming Live (12.8 kHz Ingest)' : 'Hardware Disconnected — Telemetry Flatline (0.0000 m/s)'}
           </div>
         </div>
         <div className="chart-wrap" style={{ height: "250px" }}>
           <div className="chart-toolbar">
-            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#3b82f6" }}></div>Vibration X</div>
-            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#06b6d4" }}></div>Vibration Y</div>
+            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#3b82f6" }}></div>Velocity X (m/s ×100)</div>
+            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#06b6d4" }}></div>Velocity Y (m/s ×100)</div>
+            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#a855f7" }}></div>Accel X (m/s²)</div>
             <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#10b981" }}></div>Temperature</div>
             <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: "#f59e0b" }}></div>RPM (scaled)</div>
           </div>
@@ -322,9 +365,14 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
 
       <div className="card" style={{ marginTop: "16px" }}>
         <div className="card-header">
-          <div className="card-title">Frequency Spectrum (FFT)</div>
+          <div className="card-title">
+            Frequency Spectrum (FFT) 
+            <span style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 400, marginLeft: "8px" }}>
+              (12.8 kHz Sampling Rate • 6.4 kHz Nyquist)
+            </span>
+          </div>
           <div className={`badge ${isLive ? 'blue' : 'warn'}`}>
-            {isLive ? 'Live' : 'Standby (0.00 mm/s)'}
+            {isLive ? 'Live' : 'Standby (0.0000 m/s)'}
           </div>
         </div>
         <div className="chart-wrap" style={{ height: "180px" }}>

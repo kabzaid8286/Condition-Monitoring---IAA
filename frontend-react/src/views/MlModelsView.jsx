@@ -37,8 +37,8 @@ export default function MlModelsView({ data = { vibX: [], vibY: [], temp: [], rp
       };
     }
 
-    // ISO 10816-3 thresholds: <2.8 mm/s Good, >4.5 Warning, >7.1 Critical
-    const vibStress = Math.max(0, currentVibX - 1.5) / 6.0;
+    // ISO 10816-3 thresholds: <0.0028 m/s Good, >0.0045 m/s Warning, >0.0071 m/s Critical
+    const vibStress = Math.max(0, currentVibX - 0.0015) / 0.0060;
     const tempStress = Math.max(0, currentTemp - 40.0) / 40.0;
     const combinedStress = Math.min(0.99, Math.max(0.08, (vibStress * 0.7) + (tempStress * 0.3)));
 
@@ -55,9 +55,9 @@ export default function MlModelsView({ data = { vibX: [], vibY: [], temp: [], rp
         anomalyScore: parseFloat(combinedStress.toFixed(2)),
         rul: calcRul(1.0),
         faults: [
-          { label: 'Imbalance (1X)', state: currentVibX > 4.5 ? 'warn' : 'none' },
-          { label: 'Shaft Misalignment', state: (currentVibX > 4.0 && currentVibY > 3.0) ? 'warn' : 'none' },
-          { label: 'Bearing Wear (BPFO)', state: (currentTemp > 65 || currentVibX > 5.5) ? 'active' : currentTemp > 52 ? 'warn' : 'none' },
+          { label: 'Imbalance (1X)', state: currentVibX > 0.0045 ? 'warn' : 'none' },
+          { label: 'Shaft Misalignment', state: (currentVibX > 0.0040 && currentVibY > 0.0030) ? 'warn' : 'none' },
+          { label: 'Bearing Wear (BPFO)', state: (currentTemp > 65 || currentVibX > 0.0055) ? 'active' : currentTemp > 52 ? 'warn' : 'none' },
           { label: 'Mechanical Looseness', state: Math.abs(currentRpm - 1480) > 40 ? 'warn' : 'none' }
         ]
       },

@@ -83,7 +83,7 @@ export default function ComparisonView({ data: activeData = {}, isConnected = fa
         borderWidth: 1,
         padding: 10,
         callbacks: {
-          label: (context) => ` ${context.dataset.label}: ${context.parsed.y.toFixed(2)} mm/s`
+          label: (context) => ` ${context.dataset.label}: ${context.parsed.y.toFixed(4)} m/s`
         }
       }
     },
@@ -94,12 +94,12 @@ export default function ComparisonView({ data: activeData = {}, isConnected = fa
       },
       y: {
         min: 0,
-        max: 10,
+        max: 0.015,
         grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
         ticks: {
           color: '#8b96aa',
           padding: 8,
-          callback: (val) => `${val} mm/s`
+          callback: (val) => `${val} m/s`
         }
       }
     }
@@ -170,7 +170,7 @@ export default function ComparisonView({ data: activeData = {}, isConnected = fa
                   </div>
                 </div>
                 <div className="comparison-metric-value" style={{ color: 'var(--accent)' }}>
-                  {vib} mm/s
+                  {vib} m/s
                 </div>
               </div>
 

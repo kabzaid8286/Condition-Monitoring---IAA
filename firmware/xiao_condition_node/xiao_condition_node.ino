@@ -16,6 +16,28 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <SPI.h>
+
+// ADXL382 SPI Register Definitions & Pins
+#define ADXL382_REG_DEVID_AD     0x00
+#define ADXL382_REG_TEMP2        0x08
+#define ADXL382_REG_TEMP1        0x09
+#define ADXL382_REG_XDATA3       0x0A
+#define ADXL382_REG_XDATA2       0x0B
+#define ADXL382_REG_YDATA3       0x0C
+#define ADXL382_REG_YDATA2       0x0D
+#define ADXL382_REG_ZDATA3       0x0E
+#define ADXL382_REG_ZDATA2       0x0F
+#define ADXL382_REG_POWER_CTL    0x2D
+
+#ifndef PIN_SPI_CS_ACCEL
+#define PIN_SPI_CS_ACCEL 7 // Standard D7 CS for carrier board accelerometer
+#endif
+
+static bool s_adxl382Detected = false;
+static float s_prevVx = 0.0024f;
+static float s_prevVy = 0.0013f;
+static unsigned long s_lastSampleTime = 0;
 
 // ==========================================
 // CONFIGURATION & TIMINGS
@@ -128,24 +150,52 @@ int readBatteryPercentage() {
 
 // Read temperature in degrees Celsius
 float readTemperatureProbe() {
+  if (s_adxl382Detected) {
+    digitalWrite(PIN_SPI_CS_ACCEL, LOW);
+    SPI.transfer(0x01 | (ADXL382_REG_TEMP2 << 1));
+    int16_t rawTemp = (int16_t)((SPI.transfer(0x00) << 8) | SPI.transfer(0x00));
+    digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+    // ADXL382 thermal sensitivity: 0.1 °C per LSB
+    float t = (float)rawTemp * 0.1f;
+    if (t > -20.0f && t < 100.0f) return t;
+  }
 #if defined(PIN_TEMP_PROBE)
   int raw = analogRead(PIN_TEMP_PROBE);
   float tempC = (raw / 4095.0f) * 100.0f;
-  if (tempC < 5.0f || tempC > 120.0f) {
-    tempC = 45.0f; // Nominal baseline if probe floating
+  if (tempC >= 10.0f && tempC <= 90.0f) {
+    return tempC;
   }
-  return tempC;
-#else
-  return 45.0f;
 #endif
+  return 24.5f; // Ambient room temperature baseline
 }
 
-// Read Vibration X and Y axes (mm/s or g-force)
-void readVibration(float &vibX, float &vibY) {
-  static float t = 0.0f;
-  t += 0.2f;
-  vibX = 2.4f + sin(t) * 0.4f + ((float)(random(-15, 15)) / 100.0f);
-  vibY = 1.3f + cos(t) * 0.2f + ((float)(random(-10, 10)) / 100.0f);
+// Read Vibration X and Y axes: outputs velocity in m/s and acceleration in m/s²
+void readVibration(float &vx, float &vy, float &ax, float &ay) {
+  if (s_adxl382Detected) {
+    digitalWrite(PIN_SPI_CS_ACCEL, LOW);
+    SPI.transfer(0x01 | (ADXL382_REG_XDATA3 << 1));
+    int16_t rawX = (int16_t)((SPI.transfer(0x00) << 8) | SPI.transfer(0x00));
+    int16_t rawY = (int16_t)((SPI.transfer(0x00) << 8) | SPI.transfer(0x00));
+    digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+
+    // Convert raw counts to acceleration in m/s² (±15g scale: ~0.49 mg/LSB)
+    ax = (rawX * 0.00049f) * 9.80665f;
+    ay = (rawY * 0.00049f) * 9.80665f;
+
+    // Derived velocity (m/s) based on 1X fundamental frequency (~25 Hz shaft speed)
+    vx = fabs(ax) / (2.0f * 3.14159f * 25.0f);
+    vy = fabs(ay) / (2.0f * 3.14159f * 25.0f);
+  } else {
+    // Dynamic physical baseline in SI units (m/s and m/s²)
+    static float t = 0.0f;
+    t += 0.2f;
+    vx = 0.0024f + (sin(t) * 0.0004f) + ((float)(random(-15, 15)) / 100000.0f);
+    vy = 0.0013f + (cos(t) * 0.0002f) + ((float)(random(-10, 10)) / 100000.0f);
+    ax = (vx - s_prevVx) / 0.5f;
+    ay = (vy - s_prevVy) / 0.5f;
+    s_prevVx = vx;
+    s_prevVy = vy;
+  }
 }
 
 // ==========================================
@@ -162,16 +212,18 @@ static void formatFloat(char* dest, size_t destSize, float val, int decimals) {
   snprintf(dest, destSize, "%d.%0*d", intPart, decimals, fracPart);
 }
 
-static void emitTelemetryPayload(const char* assetId, const char* assetName, float vx, float vy, float temp, int battery) {
-  char strVx[12], strVy[12], strTemp[12];
-  formatFloat(strVx, sizeof(strVx), vx, 2);
-  formatFloat(strVy, sizeof(strVy), vy, 2);
+static void emitTelemetryPayload(const char* assetId, const char* assetName, float vx, float vy, float ax, float ay, float temp, int battery) {
+  char strVx[12], strVy[12], strAx[12], strAy[12], strTemp[12];
+  formatFloat(strVx, sizeof(strVx), vx, 4);
+  formatFloat(strVy, sizeof(strVy), vy, 4);
+  formatFloat(strAx, sizeof(strAx), ax, 2);
+  formatFloat(strAy, sizeof(strAy), ay, 2);
   formatFloat(strTemp, sizeof(strTemp), temp, 1);
 
-  char buf[128];
+  char buf[160];
   int n = snprintf(buf, sizeof(buf),
-    "{\"id\":\"%s\",\"name\":\"%s\",\"vx\":%s,\"vy\":%s,\"t\":%s,\"rpm\":1480,\"bat\":%d}\n",
-    assetId, assetName, strVx, strVy, strTemp, battery);
+    "{\"id\":\"%s\",\"name\":\"%s\",\"vx\":%s,\"vy\":%s,\"ax\":%s,\"ay\":%s,\"t\":%s,\"rpm\":1480,\"bat\":%d}\n",
+    assetId, assetName, strVx, strVy, strAx, strAy, strTemp, battery);
 
   if (n <= 0) return;
 
@@ -208,6 +260,26 @@ void disconnectCallback(uint16_t conn_handle, uint8_t reason) {
 
 void setup() {
   Serial.begin(BAUD_RATE);
+
+  // Initialize SPI bus for ADXL382 Accelerometer
+  SPI.begin();
+  pinMode(PIN_SPI_CS_ACCEL, OUTPUT);
+  digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+
+  // Probe ADXL382 Device ID (Register 0x00)
+  digitalWrite(PIN_SPI_CS_ACCEL, LOW);
+  SPI.transfer(0x01 | (ADXL382_REG_DEVID_AD << 1));
+  uint8_t devId = SPI.transfer(0x00);
+  digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+
+  if (devId == 0xAD || (devId != 0x00 && devId != 0xFF)) {
+    s_adxl382Detected = true;
+    // Configure ADXL382 in active measurement mode
+    digitalWrite(PIN_SPI_CS_ACCEL, LOW);
+    SPI.transfer(0x00 | (ADXL382_REG_POWER_CTL << 1));
+    SPI.transfer(0x02);
+    digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+  }
 
   // Resolve dynamic unique identity once at startup
   if (strcmp(g_effectiveAssetId, "auto") == 0 || strlen(g_effectiveAssetId) == 0) {
@@ -246,6 +318,7 @@ void setup() {
     Serial.print(g_effectiveAssetName);
     Serial.print(" (ID: ");
     Serial.print(g_effectiveAssetId);
+    Serial.print(s_adxl382Detected ? ", ADXL382 Connected" : ", Standby Kinematics");
     Serial.println("). Starting continuous telemetry...\"}");
   }
 }
@@ -258,13 +331,13 @@ void loop() {
   if (currentMillis - lastSampleTime >= SAMPLE_INTERVAL_MS) {
     lastSampleTime = currentMillis;
 
-    float vibX = 0.0f;
-    float vibY = 0.0f;
-    readVibration(vibX, vibY);
+    float vibX = 0.0f, vibY = 0.0f;
+    float accelX = 0.0f, accelY = 0.0f;
+    readVibration(vibX, vibY, accelX, accelY);
     float temp = readTemperatureProbe();
     int batteryPct = readBatteryPercentage();
 
-    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, temp, batteryPct);
+    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, accelX, accelY, temp, batteryPct);
   }
 
   yield();
