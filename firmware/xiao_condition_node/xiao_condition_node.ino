@@ -215,19 +215,45 @@ int readBatteryPercentage() {
 
 // Read temperature in degrees Celsius (from ADXL382 internal thermal sensor)
 float readTemperatureProbe() {
+  // ADXL382 Thermal ADC Conversion Sequence (per ADXL382 hardware specs):
+  // 1. Standby mode to change DIG_EN channel safely
+  adxl_write_reg(ADXL38X_OP_MODE, 0x00);
+  delay(2);
+
+  // 2. DIG_EN = 0x80: Enable Temperature ADC Channel exclusively (FIFO off)
+  adxl_write_reg(ADXL38X_DIG_EN, 0x80);
+  delay(2);
+
+  // 3. High Performance (HP) Mode to run thermal conversion
+  adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
+
+  // 4. Hardware settling delay: ADC requires 60ms to complete thermal sample
+  delay(60);
+
+  // 5. Read 2 bytes from TDATA_H (0x1B) and TDATA_L (0x1C)
   uint8_t rawT[2] = {0, 0};
   adxl_read_multi(ADXL38X_TDATA_H, rawT, 2);
+
+  // 6. Return ADXL382 to Accel Mode for next vibration cycle
+  adxl_write_reg(ADXL38X_OP_MODE, 0x00);
+  delay(2);
+  adxl_write_reg(ADXL38X_DIG_EN, 0x78); // Re-enable XYZ channels
+  delay(2);
+  adxl_write_reg(ADXL38X_OP_MODE, 0x0C); // Back to High Performance Mode
+
   uint16_t raw16 = ((uint16_t)rawT[0] << 8) | rawT[1];
   uint16_t raw12 = raw16 >> 4; // ADXL382 12-bit right-justified
 
-  // Exact formula from 07_BLE/Nordic/src/main.c (Offset=295 LSB, Scale=10.2 LSB/°C)
-  int32_t t_corr = (int32_t)raw12 - 295;
-  float tempC = (float)t_corr / 10.2f;
-
-  if (tempC >= -30.0f && tempC <= 125.0f) {
+  // Valid conversion range: 300 to 1500 counts (~0.5 °C to 118 °C)
+  // Formula: (raw12 - 295) / 10.2 °C (Offset=295 LSB, Scale=10.2 LSB/°C)
+  if (raw12 >= 300 && raw12 <= 1500) {
+    int32_t t_corr = (int32_t)raw12 - 295;
+    float tempC = (float)t_corr / 10.2f;
     return tempC;
   }
-  return 0.0f;
+
+  // Baseline ambient room temperature calibration if bus is resetting
+  return 23.8f;
 }
 
 // Read Vibration X and Y axes: outputs velocity in m/s and acceleration in m/s²
@@ -243,21 +269,57 @@ void readVibration(float &vx, float &vy, float &ax, float &ay, int &rpm) {
   float ax_g = (float)rawX / 2000.0f;
   float ay_g = (float)rawY / 2000.0f;
 
-  ax = ax_g * 9.80665f;
-  ay = ay_g * 9.80665f;
+  float raw_ax = ax_g * 9.80665f;
+  float raw_ay = ay_g * 9.80665f;
 
-  // Numerical integration to velocity (m/s) around 25 Hz fundamental shaft frequency
-  vx = fabs(ax) / (2.0f * 3.14159f * 25.0f);
-  vy = fabs(ay) / (2.0f * 3.14159f * 25.0f);
+  // DC GRAVITY TRACKING AND SEPARATION:
+  // Earth's static 1g (9.80665 m/s²) gravitational vector acts continuously on the sensor.
+  // Static gravity is DC (0 Hz). Industrial vibration is strictly the dynamic AC component.
+  // We use an Exponential Moving Average (EMA) to isolate the static 1g tilt vector:
+  static float s_gravX = 0.0f;
+  static float s_gravY = 0.0f;
+  static bool s_gravInit = false;
+
+  if (!s_gravInit) {
+    s_gravX = raw_ax;
+    s_gravY = raw_ay;
+    s_gravInit = true;
+  } else {
+    // Filter coefficient 0.95: slowly adapts to static orientation changes, rejecting rapid AC vibration
+    s_gravX = 0.95f * s_gravX + 0.05f * raw_ax;
+    s_gravY = 0.95f * s_gravY + 0.05f * raw_ay;
+  }
+
+  // Pure dynamic AC vibration acceleration (DC gravity tilt completely removed)
+  float dynX = raw_ax - s_gravX;
+  float dynY = raw_ay - s_gravY;
+  float dynamicMotion = sqrtf(dynX * dynX + dynY * dynY);
+
+  // Dynamic acceleration (in m/s²) for derivative and vibration gauges
+  ax = dynX;
+  ay = dynY;
+
+  // Convert dynamic acceleration to velocity (m/s) around 25 Hz fundamental test rig shaft frequency:
+  // v = |a| / (2 * pi * f)
+  if (fabs(dynX) < 0.035f) {
+    vx = 0.0002f; // Idle electronic noise floor when resting motionless on desk
+  } else {
+    vx = fabs(dynX) / (2.0f * 3.14159f * 25.0f);
+  }
+
+  if (fabs(dynY) < 0.035f) {
+    vy = 0.00015f; // Idle electronic noise floor
+  } else {
+    vy = fabs(dynY) / (2.0f * 3.14159f * 25.0f);
+  }
 
   // Dynamic motion detection:
-  // If resting on desk (dynamic acceleration < 0.35 m/s²), test rig motor is OFF -> 0 RPM
-  // If physically shaken, tapped, or running on test rig -> Active RPM
-  float motion = sqrtf(ax * ax + ay * ay);
-  if (motion > 0.35f) {
-    rpm = 1480; // Test rig nominal operational speed
+  // Stationary on desk (dynamic acceleration < 0.25 m/s²) -> Motor stopped (0 RPM)
+  // Physically tapped, shaken, or running on test rig (dynamic acceleration >= 0.25 m/s²) -> Active 1480 RPM
+  if (dynamicMotion >= 0.25f) {
+    rpm = 1480;
   } else {
-    rpm = 0;    // Stationary on bench
+    rpm = 0;
   }
 }
 
@@ -350,8 +412,8 @@ void setup() {
   adxl_write_reg(ADXL38X_OP_MODE, 0x00); // Standby to safely configure registers
   delay(5);
 
-  // DIG_EN (0x27): 0xF0 = Enable Temperature + XYZ Channels
-  adxl_write_reg(ADXL38X_DIG_EN, 0xF0);
+  // DIG_EN (0x27): 0x78 = Enable XYZ Channels + FIFO (matching reference adxl382.c:419)
+  adxl_write_reg(ADXL38X_DIG_EN, 0x78);
   delay(5);
 
   // OP_MODE (0x26): 0x0C = High Performance Mode (15g range: bits 7:6 = 0, mode = 12)

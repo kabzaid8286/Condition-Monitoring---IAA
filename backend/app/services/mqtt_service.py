@@ -69,14 +69,14 @@ class TelemetryHub:
                 ax = previous.get("accelX", 0.0)
                 ay = previous.get("accelY", 0.0)
                 tp = previous.get("temp", 0.0)
-                rp = previous.get("rpm", 1480.0)
+                rp = previous.get("rpm", 0.0)
             else:
                 vx = raw_vx
                 vy = float(sensors.get("vibration_y", 0.0))
                 ax = float(sensors.get("accel_x", 0.0))
                 ay = float(sensors.get("accel_y", 0.0))
                 tp = raw_temp
-                rp = float(sensors.get("rpm", 1480.0))
+                rp = float(sensors["rpm"]) if "rpm" in sensors else 0.0
 
             data_item = {
                 "asset_id": asset_id,

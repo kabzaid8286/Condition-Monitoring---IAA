@@ -166,7 +166,7 @@ class SensorReader:
                             "accel_y": kinematics["accel_y"],
                             "accel_g": kinematics["accel_g"],
                             "temperature": float(data.get("temperature") if data.get("temperature") is not None else data.get("temp", data.get("t", 0.0))),
-                            "rpm": float(data.get("rpm", 1480.0)),
+                            "rpm": float(data["rpm"]) if "rpm" in data else 0.0,
                             "battery_pct": int(data.get("battery_pct") if data.get("battery_pct") is not None else data.get("bat", data.get("battery", 100))),
                             "sample_rate_hz": kinematics["sample_rate_hz"],
                             "burst_state": str(data.get("burst_state", "active")),
@@ -262,7 +262,7 @@ async def run_ble_mode(mqtt_client, args):
                             "accel_y": kinematics["accel_y"],
                             "accel_g": kinematics["accel_g"],
                             "temperature": float(payload_json.get("temperature") if payload_json.get("temperature") is not None else payload_json.get("temp", payload_json.get("t", 0.0))),
-                            "rpm": float(payload_json.get("rpm", 1480.0)),
+                            "rpm": float(payload_json["rpm"]) if "rpm" in payload_json else 0.0,
                             "battery_pct": int(payload_json.get("battery_pct") if payload_json.get("battery_pct") is not None else payload_json.get("bat", payload_json.get("b", 100))),
                             "sample_rate_hz": kinematics["sample_rate_hz"],
                             "burst_state": str(payload_json.get("burst_state", "active"))
