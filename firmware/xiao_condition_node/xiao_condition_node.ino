@@ -18,36 +18,93 @@
 #include <Wire.h>
 #include <SPI.h>
 
-// ADXL382 SPI Register Definitions & Pins (From Hardware Reference Schematics)
-#define ADXL38X_DEVID_AD         0x00 // Returns 0xAD
-#define ADXL38X_DEVID_MST        0x01 // Returns 0x1D
-#define ADXL38X_XDATA_H          0x15
-#define ADXL38X_XDATA_L          0x16
-#define ADXL38X_YDATA_H          0x17
-#define ADXL38X_YDATA_L          0x18
-#define ADXL38X_ZDATA_H          0x19
-#define ADXL38X_ZDATA_L          0x1A
-#define ADXL38X_TDATA_H          0x1B // Temperature MSB (0.1 °C/LSB)
-#define ADXL38X_TDATA_L          0x1C // Temperature LSB
-#define ADXL38X_OP_MODE          0x26 // Operating Mode (0x00 = High Performance Mode)
+// ==============================================================================
+// ADXL382 SPI HARDWARE PINOUT (Verified from Carrier Board Traces & Nordic main.c)
+// D0 = P1.04 (Pin 36): SCK (Clock)
+// D1 = P1.05 (Pin 37): MOSI (Master Out Slave In)
+// D2 = P1.06 (Pin 38): MISO (Master In Slave Out)
+// D3 = P1.07 (Pin 39): CS (Chip Select for ADXL382)
+// D5 = P1.11 (Pin 11): LOAD_SWITCH (Power Enable for Carrier Board Sensors)
+// ==============================================================================
 
-// Carrier Board Hardware Control Pins (Seeed Studio XIAO Pinout)
-#if defined(D5)
-#define PIN_LOAD_SWITCH          D5   // D5 / P1.11: Hardware load switch powering ADXL382 & PSRAM
+#if defined(D0)
+#define PIN_ADXL_SCK       D0
+#define PIN_ADXL_MOSI      D1
+#define PIN_ADXL_MISO      D2
+#define PIN_ADXL_CS        D3
+#define PIN_LOAD_SWITCH    D5
 #else
-#define PIN_LOAD_SWITCH          5
+#define PIN_ADXL_SCK       0
+#define PIN_ADXL_MOSI      1
+#define PIN_ADXL_MISO      2
+#define PIN_ADXL_CS        3
+#define PIN_LOAD_SWITCH    5
 #endif
 
-#if defined(D7)
-#define PIN_SPI_CS_ACCEL         D7   // D7 / P1.07: Chip Select (CS) for ADXL382 Accelerometer
-#else
-#define PIN_SPI_CS_ACCEL         7
-#endif
+// Exact ADXL382 Register Addresses (from 07_BLE/Nordic/src/adxl382.h)
+#define ADXL38X_DEVID_AD   0x00 // Returns 0xAD
+#define ADXL38X_DEVID_MST  0x01 // Returns 0x1D
+#define ADXL38X_PART_ID    0x02 // Returns 0x17
+#define ADXL38X_XDATA_H    0x15
+#define ADXL38X_XDATA_L    0x16
+#define ADXL38X_YDATA_H    0x17
+#define ADXL38X_YDATA_L    0x18
+#define ADXL38X_ZDATA_H    0x19
+#define ADXL38X_ZDATA_L    0x1A
+#define ADXL38X_TDATA_H    0x1B // Temperature MSB
+#define ADXL38X_TDATA_L    0x1C // Temperature LSB
+#define ADXL38X_OP_MODE    0x26 // 0x00=Standby, 0x0C=High Performance (HP) Mode
+#define ADXL38X_DIG_EN     0x27 // Channel Enable: 0xF0=XYZ + Temperature
+#define ADXL38X_REG_RESET  0x2A // Soft Reset: 0x52
 
 static bool s_adxl382Detected = false;
-static float s_prevVx = 0.0003f;
-static float s_prevVy = 0.0002f;
-static unsigned long s_lastSampleTime = 0;
+
+// Direct Hardware SPI Transceiver for Carrier Board ADXL382 Pins (D0, D1, D2, D3)
+static inline uint8_t adxl_spi_transfer(uint8_t data_out) {
+  uint8_t data_in = 0;
+  for (int i = 7; i >= 0; i--) {
+    digitalWrite(PIN_ADXL_MOSI, (data_out & (1 << i)) ? HIGH : LOW);
+    delayMicroseconds(1);
+    digitalWrite(PIN_ADXL_SCK, HIGH);
+    delayMicroseconds(1);
+    if (digitalRead(PIN_ADXL_MISO)) {
+      data_in |= (1 << i);
+    }
+    digitalWrite(PIN_ADXL_SCK, LOW);
+    delayMicroseconds(1);
+  }
+  return data_in;
+}
+
+static uint8_t adxl_read_reg(uint8_t reg) {
+  digitalWrite(PIN_ADXL_CS, LOW);
+  delayMicroseconds(1);
+  adxl_spi_transfer((reg << 1) | 0x01); // Bit 0 = 1 for Read
+  uint8_t val = adxl_spi_transfer(0x00);
+  digitalWrite(PIN_ADXL_CS, HIGH);
+  delayMicroseconds(1);
+  return val;
+}
+
+static void adxl_write_reg(uint8_t reg, uint8_t val) {
+  digitalWrite(PIN_ADXL_CS, LOW);
+  delayMicroseconds(1);
+  adxl_spi_transfer((reg << 1) | 0x00); // Bit 0 = 0 for Write
+  adxl_spi_transfer(val);
+  digitalWrite(PIN_ADXL_CS, HIGH);
+  delayMicroseconds(1);
+}
+
+static void adxl_read_multi(uint8_t start_reg, uint8_t* dest, size_t count) {
+  digitalWrite(PIN_ADXL_CS, LOW);
+  delayMicroseconds(1);
+  adxl_spi_transfer((start_reg << 1) | 0x01);
+  for (size_t i = 0; i < count; i++) {
+    dest[i] = adxl_spi_transfer(0x00);
+  }
+  digitalWrite(PIN_ADXL_CS, HIGH);
+  delayMicroseconds(1);
+}
 
 // ==========================================
 // CONFIGURATION & TIMINGS
@@ -161,55 +218,68 @@ int readBatteryPercentage() {
 // Read temperature in degrees Celsius (from ADXL382 internal thermal sensor or external RTD probe)
 float readTemperatureProbe() {
   if (s_adxl382Detected) {
-    digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-    SPI.transfer((ADXL38X_TDATA_H << 1) | 0x01);
-    uint8_t th = SPI.transfer(0x00);
-    uint8_t tl = SPI.transfer(0x00);
-    digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+    uint8_t rawT[2];
+    adxl_read_multi(ADXL38X_TDATA_H, rawT, 2);
+    uint16_t raw16 = ((uint16_t)rawT[0] << 8) | rawT[1];
+    uint16_t raw12 = raw16 >> 4; // ADXL382 12-bit right-justified
 
-    int16_t rawTemp = (int16_t)((th << 8) | tl);
-    float t = (float)rawTemp / 10.0f; // ADXL382 thermal sensitivity: 0.1 °C per LSB
-    if (t > -20.0f && t < 100.0f) return t;
+    // Exact formula from 07_BLE/Nordic/src/main.c (Offset=295 LSB, Scale=10.2 LSB/°C)
+    int32_t t_corr = (int32_t)raw12 - 295;
+    float tempC = (float)t_corr / 10.2f;
+
+    if (tempC >= -30.0f && tempC <= 125.0f) {
+      return tempC;
+    }
   }
 
 #if defined(PIN_TEMP_PROBE)
   int raw = analogRead(PIN_TEMP_PROBE);
   if (raw > 50 && raw < 4000) {
     float tempC = ((float)raw / 4095.0f) * 100.0f;
-    if (tempC >= 5.0f && tempC <= 90.0f) return tempC;
+    if (tempC >= -20.0f && tempC <= 120.0f) return tempC;
   }
 #endif
 
-  return 23.5f; // Realistic ambient room temperature baseline
+  return 0.0f; // Pure physical state: 0 when disconnected
 }
 
 // Read Vibration X and Y axes: outputs velocity in m/s and acceleration in m/s²
-void readVibration(float &vx, float &vy, float &ax, float &ay) {
+void readVibration(float &vx, float &vy, float &ax, float &ay, int &rpm) {
   if (s_adxl382Detected) {
-    digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-    SPI.transfer((ADXL38X_XDATA_H << 1) | 0x01);
-    uint8_t xh = SPI.transfer(0x00);
-    uint8_t xl = SPI.transfer(0x00);
-    uint8_t yh = SPI.transfer(0x00);
-    uint8_t yl = SPI.transfer(0x00);
-    digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+    uint8_t rawAcc[4];
+    adxl_read_multi(ADXL38X_XDATA_H, rawAcc, 4);
 
-    int16_t rawX = (int16_t)((xh << 8) | xl);
-    int16_t rawY = (int16_t)((yh << 8) | yl);
+    int16_t rawX = (int16_t)((rawAcc[0] << 8) | rawAcc[1]);
+    int16_t rawY = (int16_t)((rawAcc[2] << 8) | rawAcc[3]);
 
-    // Convert raw counts to acceleration in m/s² (±60g range: ~1.83 mg/LSB; 1g = 9.80665 m/s²)
-    ax = ((float)rawX * 0.00183f) * 9.80665f;
-    ay = ((float)rawY * 0.00183f) * 9.80665f;
+    // 15g Range sensitivity: 2000 LSB/g (07_BLE/Nordic/src/adxl382.h)
+    // 1g = 9.80665 m/s²
+    float ax_g = (float)rawX / 2000.0f;
+    float ay_g = (float)rawY / 2000.0f;
 
-    // Numerical integration to velocity (m/s) based on 1X fundamental frequency (~25 Hz shaft speed)
+    ax = ax_g * 9.80665f;
+    ay = ay_g * 9.80665f;
+
+    // Numerical integration to velocity (m/s) around 25 Hz fundamental shaft frequency
     vx = fabs(ax) / (2.0f * 3.14159f * 25.0f);
     vy = fabs(ay) / (2.0f * 3.14159f * 25.0f);
+
+    // Dynamic motion detection:
+    // If resting on desk (dynamic acceleration < 0.25 m/s²), test rig motor is OFF -> 0 RPM
+    // If physically shaken, tapped, or running on test rig -> Active RPM
+    float motion = sqrtf(ax * ax + ay * ay);
+    if (motion > 0.25f) {
+      rpm = 1480; // Test rig nominal operational speed
+    } else {
+      rpm = 0;    // Stationary on bench
+    }
   } else {
-    // If SPI is quiet or resting on desk: quiet physical noise floor in m/s and m/s²
-    ax = 0.04f + ((float)(random(-10, 10)) / 1000.0f);
-    ay = 0.03f + ((float)(random(-10, 10)) / 1000.0f);
-    vx = 0.0003f + ((float)(random(-5, 5)) / 100000.0f);
-    vy = 0.0002f + ((float)(random(-5, 5)) / 100000.0f);
+    // Zero mock fallback: when sensor is unpowered or initializing
+    ax = 0.0f;
+    ay = 0.0f;
+    vx = 0.0f;
+    vy = 0.0f;
+    rpm = 0;
   }
 }
 
@@ -227,7 +297,7 @@ static void formatFloat(char* dest, size_t destSize, float val, int decimals) {
   snprintf(dest, destSize, "%d.%0*d", intPart, decimals, fracPart);
 }
 
-static void emitTelemetryPayload(const char* assetId, const char* assetName, float vx, float vy, float ax, float ay, float temp, int battery) {
+static void emitTelemetryPayload(const char* assetId, const char* assetName, float vx, float vy, float ax, float ay, float temp, int rpm, int battery) {
   char strVx[12], strVy[12], strAx[12], strAy[12], strTemp[12];
   formatFloat(strVx, sizeof(strVx), vx, 4);
   formatFloat(strVy, sizeof(strVy), vy, 4);
@@ -237,8 +307,8 @@ static void emitTelemetryPayload(const char* assetId, const char* assetName, flo
 
   char buf[160];
   int n = snprintf(buf, sizeof(buf),
-    "{\"id\":\"%s\",\"name\":\"%s\",\"vx\":%s,\"vy\":%s,\"ax\":%s,\"ay\":%s,\"t\":%s,\"rpm\":1480,\"bat\":%d}\n",
-    assetId, assetName, strVx, strVy, strAx, strAy, strTemp, battery);
+    "{\"id\":\"%s\",\"name\":\"%s\",\"vx\":%s,\"vy\":%s,\"ax\":%s,\"ay\":%s,\"t\":%s,\"rpm\":%d,\"bat\":%d}\n",
+    assetId, assetName, strVx, strVy, strAx, strAy, strTemp, rpm, battery);
 
   if (n <= 0) return;
 
@@ -281,24 +351,37 @@ void setup() {
   digitalWrite(PIN_LOAD_SWITCH, HIGH);
   delay(120); // Wait 120ms for sensor power rail to stabilize (as in Nordic reference)
 
-  // 2. Initialize SPI bus for ADXL382 Accelerometer
-  SPI.begin();
-  pinMode(PIN_SPI_CS_ACCEL, OUTPUT);
-  digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+  // 2. Configure dedicated SPI GPIOs on Carrier Board (D0=SCK, D1=MOSI, D2=MISO, D3=CS)
+  pinMode(PIN_ADXL_CS, OUTPUT);
+  digitalWrite(PIN_ADXL_CS, HIGH);
+  pinMode(PIN_ADXL_SCK, OUTPUT);
+  digitalWrite(PIN_ADXL_SCK, LOW);
+  pinMode(PIN_ADXL_MOSI, OUTPUT);
+  digitalWrite(PIN_ADXL_MOSI, LOW);
+  pinMode(PIN_ADXL_MISO, INPUT);
 
-  // 3. Probe ADXL382 Device ID (Register 0x00: expect 0xAD)
-  digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-  SPI.transfer((ADXL38X_DEVID_AD << 1) | 0x01);
-  uint8_t devId = SPI.transfer(0x00);
-  digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+  // 3. Probe ADXL382 Device ID (Register 0x00: expect 0xAD, Register 0x01: expect 0x1D)
+  uint8_t devId = adxl_read_reg(ADXL38X_DEVID_AD);
+  uint8_t devMst = adxl_read_reg(ADXL38X_DEVID_MST);
 
-  if (devId == 0xAD || (devId != 0x00 && devId != 0xFF)) {
+  if (devId == 0xAD || devMst == 0x1D || (devId != 0x00 && devId != 0xFF)) {
     s_adxl382Detected = true;
-    // Configure ADXL382 into High Performance measurement mode (Register 0x26 = 0x00)
-    digitalWrite(PIN_SPI_CS_ACCEL, LOW);
-    SPI.transfer((ADXL38X_OP_MODE << 1) | 0x00);
-    SPI.transfer(0x00); // 0x00 = ADXL38X_MODE_HP
-    digitalWrite(PIN_SPI_CS_ACCEL, HIGH);
+
+    // Software reset
+    adxl_write_reg(ADXL38X_REG_RESET, 0x52);
+    delay(20);
+
+    // Enter Standby to safely configure registers
+    adxl_write_reg(ADXL38X_OP_MODE, 0x00);
+    delay(5);
+
+    // DIG_EN (0x27): 0xF0 = Enable Temperature + XYZ Channels (07_BLE/Nordic/src/adxl382.h)
+    adxl_write_reg(ADXL38X_DIG_EN, 0xF0);
+    delay(5);
+
+    // OP_MODE (0x26): 0x0C = High Performance Mode (15g range: bits 7:6 = 0, mode = 12)
+    adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
+    delay(20);
   }
 
   // Resolve dynamic unique identity once at startup
@@ -338,7 +421,7 @@ void setup() {
     Serial.print(g_effectiveAssetName);
     Serial.print(" (ID: ");
     Serial.print(g_effectiveAssetId);
-    Serial.print(s_adxl382Detected ? ", ADXL382 Connected" : ", Standby Kinematics");
+    Serial.print(s_adxl382Detected ? ", ADXL382 Connected (0xAD)" : ", Standby Kinematics");
     Serial.println("). Starting continuous telemetry...\"}");
   }
 }
@@ -353,11 +436,12 @@ void loop() {
 
     float vibX = 0.0f, vibY = 0.0f;
     float accelX = 0.0f, accelY = 0.0f;
-    readVibration(vibX, vibY, accelX, accelY);
+    int rpm = 0;
+    readVibration(vibX, vibY, accelX, accelY, rpm);
     float temp = readTemperatureProbe();
     int batteryPct = readBatteryPercentage();
 
-    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, accelX, accelY, temp, batteryPct);
+    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, accelX, accelY, temp, rpm, batteryPct);
   }
 
   yield();
