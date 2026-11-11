@@ -24,7 +24,7 @@ export const AssetProvider = ({ children }) => {
         // Exclude any deleted assets on reload
         const filtered = {};
         Object.entries(parsed).forEach(([id, val]) => {
-          if (!deleted.includes(id)) {
+          if (!deleted.includes(id) && id !== 'test-rig-a') {
             filtered[id] = val;
           }
         });
@@ -153,7 +153,7 @@ export const AssetProvider = ({ children }) => {
 
       const newAsset = {
         name: formattedName,
-        label: 'Auto-Detected Sensor Node',
+        label: cleanId.toUpperCase(),
         basevib: 0,
         basetemp: 0,
         baserpm: 0,

@@ -423,7 +423,7 @@ def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi 5 / PC Condition Monitoring Telemetry Gateway")
     parser.add_argument("--host", default=DEFAULT_BROKER_HOST, help="MQTT Broker Host (default: localhost)")
     parser.add_argument("--port", type=int, default=DEFAULT_BROKER_PORT, help="MQTT Broker Port (default: 1883)")
-    parser.add_argument("--asset", default="test-rig-a", help="Monitored Asset ID fallback (default: test-rig-a or auto-detected from microcontroller)")
+    parser.add_argument("--asset", default="", help="Monitored Asset ID fallback (auto-detected from microcontroller)")
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SEC, help="Publish interval in seconds (default: 1.0)")
     parser.add_argument("--mode", default="auto", choices=["auto", "ble", "serial", "simulation"], help="Data mode: 'auto' (Concurrent USB Serial + BLE), 'ble' (Wireless Bluetooth), 'serial' (USB only), or 'simulation'")
     parser.add_argument("--serial-port", default=None, help="Explicit USB serial port (e.g. /dev/cu.usbmodem1101 or /dev/ttyACM0). Auto-detects if omitted.")

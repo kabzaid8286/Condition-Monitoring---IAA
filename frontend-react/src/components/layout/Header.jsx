@@ -59,7 +59,9 @@ export default function Header({ userRole, activeAsset, setActiveAsset, data, kp
               <option value="">Awaiting Hardware Sensors...</option>
             ) : (
               Object.entries(assets).map(([id, asset]) => (
-                <option key={id} value={id}>{asset.name} — {asset.label}</option>
+                <option key={id} value={id}>
+                  {asset.name}{asset.label && asset.label !== asset.name ? ` — ${asset.label}` : ''}
+                </option>
               ))
             )}
           </select>

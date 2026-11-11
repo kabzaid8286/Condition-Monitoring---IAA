@@ -53,7 +53,9 @@ class TelemetryHub:
         """Called when an MQTT message arrives from Raspberry Pi 5"""
         try:
             payload = json.loads(msg.payload.decode('utf-8'))
-            asset_id = payload.get("asset_id", "test-rig-a")
+            asset_id = str(payload.get("asset_id") or payload.get("id") or "").strip()
+            if not asset_id:
+                return
             asset_name = payload.get("name") or payload.get("asset_name") or asset_id.replace('-', ' ').title()
             sensors = payload.get("sensors", {})
 
