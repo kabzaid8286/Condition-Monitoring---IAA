@@ -326,7 +326,7 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
           max={100}
           decimals={1}
           unit="°C"
-          label="BEARING TEMPERATURE"
+          label="BEARING TEMP (LS5-PT100A)"
           color="#10b981"
           warnThreshold={70}
           critThreshold={85}

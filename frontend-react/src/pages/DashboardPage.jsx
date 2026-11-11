@@ -48,7 +48,7 @@ export default function DashboardPage({ userRole, onLogout }) {
     }
   };
 
-  const { data, kpis, isConnected, connectionMode } = useSensorData(activeAsset);
+  const { data, kpis, isConnected, connectionMode } = useSensorData(activeAsset, handleSelectAsset);
 
   return (
     <div id="app" className="visible">

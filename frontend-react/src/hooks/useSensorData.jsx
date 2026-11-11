@@ -54,13 +54,18 @@ function getInitialDataBuffer(assetId) {
   return { labels, vibX, vibY, vibZ, accelX, accelY, temp, rpm };
 }
 
-export default function useSensorData(activeAsset = '') {
+export default function useSensorData(activeAsset = '', onAutoSelectLiveAsset = null) {
   const { assets, autoRegisterSensor } = useAssets();
 
   // Per-asset tracking maps
   const assetLastPacketTimeRef = useRef({}); // { [assetId]: timestamp }
   const assetDataMapRef = useRef({});        // { [assetId]: dataBuffer }
   const assetKpisMapRef = useRef({});        // { [assetId]: kpiObject }
+  const onAutoSelectRef = useRef(onAutoSelectLiveAsset);
+
+  useEffect(() => {
+    onAutoSelectRef.current = onAutoSelectLiveAsset;
+  }, [onAutoSelectLiveAsset]);
 
   // Check if current asset is live right now
   const isCurrentLiveInitial = () => {
@@ -229,8 +234,17 @@ export default function useSensorData(activeAsset = '') {
 
               assetKpisMapRef.current[incomingId] = nextKpis;
 
-              // Only update live active UI state if this packet matches the currently selected machine
-              if (incomingId === activeAssetRef.current) {
+              // Auto-focus switcher: If current active asset is empty or offline, automatically lock onto live streaming sensor
+              const currentActive = activeAssetRef.current;
+              const currentLastSeen = assetLastPacketTimeRef.current[currentActive] || 0;
+              const isCurrentLive = Boolean(currentActive && currentLastSeen > 0 && (Date.now() - currentLastSeen) <= 3500);
+
+              if (!isCurrentLive && onAutoSelectRef.current && currentActive !== incomingId) {
+                onAutoSelectRef.current(incomingId);
+              }
+
+              // Update live active UI state if this packet matches the currently selected machine OR if the current machine was offline
+              if (incomingId === activeAssetRef.current || !isCurrentLive) {
                 setConnectionMode('live');
                 setIsConnected(true);
                 setData(nextData);

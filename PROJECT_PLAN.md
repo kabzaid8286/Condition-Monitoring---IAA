@@ -46,7 +46,7 @@
 - [x] **Physical Sensor Verification**: Verified live streaming with physical coin-cell node `IAA-xiao-bafdedc8` (`Sensor Node (BAFDEDC8)`).
 - [x] **Automation & Clean Auth**: Integrated BLE daemon into `start.sh` / `stop.sh` and set default clean login screen display.
 - [x] **Purge Mock Defaults**: Purged `test-rig-a` and mock data entirely; live stream defaults dynamically to discovered hardware nodes (e.g. `Sensor Node (BAFDEDC8)`).
-- [ ] **Backlog Feature**: Auto-focus switcher on newly discovered live sensor streams (saved for future phase).
+- [x] **Auto-Focus Switcher**: Implemented dynamic live stream auto-focus in `DashboardPage.jsx` and `useSensorData.jsx`; the UI automatically locks onto any newly discovered streaming hardware sensor node if the current machine is offline.
 
 ---
 
