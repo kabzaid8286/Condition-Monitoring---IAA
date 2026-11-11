@@ -44,6 +44,10 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Implemented ADXL382 SPI register interface with internal thermal sensor (0.1 °C/LSB) in firmware, replacing synthetic mock sine waves with physical sensor telemetry.
   - Auto Dual Gateway Ingestion (`--mode auto`): Concurrently runs USB serial reader and BLE wireless scanner in `gateway/rpi_publisher.py` with zero-config auto-detection.
   - Verified active live wireless physical sensor streaming with hardware node `IAA-xiao-78779ddd` (`Sensor Node (78779DDD)`), delivering real-time dynamic motion, vibration, acceleration, temperature, and shaft RPM.
+- **Phase 5.7: Multi-Sensor Grounding & Selection Isolation (Completed)**:
+  - Fixed frontend dropdown glitching: auto-focus now only defaults on empty asset selection; manual machine selection is strictly preserved without snapping back to auto-detected sensor.
+  - Restored continuous 2 Hz physical telemetry in firmware calling `readAllSensors()`, enabling dynamic acceleration, velocity integration, and motion-based RPM detection.
+  - Integrated Texas Instruments ADS1220 24-bit ADC SPI driver (pins D6-D10) for 3-wire PT100 RTD industrial probe (J2 terminal block) with seamless ADXL382 on-chip thermal fallback.
 
 ## 4. Current Phase & Next Milestones
 - **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:

@@ -57,6 +57,13 @@
 - [x] **12.8 kHz Sampling Rate & FFT**: Configured 12.8 kHz burst sampling capability with FFT spectrum analyzer displaying full 6.4 kHz Nyquist bandwidth and bearing defect harmonic frequency bands (BPFO, 1X, 2X, resonances).
 - [x] **ADXL382 Hardware Interface**: Reversed carrier board routing and implemented dedicated bit-banging SPI transceiver for pins D0 (SCK), D1 (MOSI), D2 (MISO), D3 (CS), with D5 load switch driven HIGH. Configured registers (DIG_EN 0xF0 for simultaneous XYZ+Temp, OP_MODE 0x0C for High Performance mode) with physics formulas (Temp offset 295 LSB, scale 10.2 LSB/°C; Accel 2000 LSB/g in 15g mode) and motion-derived RPM (0 RPM when stationary on desk), completely eliminating synthetic sine waves and static fallbacks.
 
+---
+
+## Phase 5.7: Multi-Sensor Grounding & Selection Isolation (Completed)
+- [x] **Machine Selection Isolation**: Fixed auto-focus hijacking in `useSensorData.jsx`; manually selected machines are now strictly preserved in the dropdown without glitching back to streaming sensors.
+- [x] **Continuous 2 Hz Telemetry**: Restored continuous active sensor acquisition in `xiao_condition_node.ino` calling `readAllSensors()`, enabling dynamic acceleration, velocity integration, and motion-based RPM detection.
+- [x] **ADS1220 24-bit ADC & PT100 Temperature Probe**: Integrated SPI driver for Texas Instruments ADS1220 (D6-D10) reading the 3-wire PT100 RTD probe connected to J2 terminal block with automatic fallback to ADXL382 on-chip thermal sensor.
+
 ## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
 *Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*
 - [ ] **Transfer Gateway Code**: Sync `gateway/rpi_publisher.py` and requirements (`paho-mqtt`, `bleak`, `pyserial`) to the Raspberry Pi 5.

@@ -1,17 +1,14 @@
 /**
  * Condition Monitoring App (IAA / HS Aalen)
- * Microcontroller Firmware for Seeed Studio XIAO
- *
- * Target: Seeed Studio XIAO (ESP32-C3 / ESP32-S3 / RP2040 / SAMD21)
- * Purpose: Low-power burst sensor acquisition for test rigs
- * Duty Cycle: 10-second active burst every 5 minutes (Deep Sleep between
- * bursts)
+ * Microcontroller Firmware for Seeed Studio XIAO (nRF54L15 / nRF52 / ESP32)
  *
  * Hardware:
  *   - Microcontroller: Seeed Studio XIAO
- *   - Dual Coin-Cell Battery Power (CR2032 / CR2450)
- *   - Vibration Sensor: MEMS Accelerometer (I2C / Analog)
- *   - Temperature Sensor: Industrial Temp Probe (Analog / 1-Wire)
+ *   - Dual Coin-Cell Battery Power (CR2450)
+ *   - Vibration Sensor: Analog Devices ADXL382 High-Bandwidth Accelerometer (SPI)
+ *   - Temperature Sensor: Texas Instruments ADS1220 24-bit ADC with PT100 RTD Probe (SPI)
+ *                         + ADXL382 On-Chip Thermal Sensor Fallback
+ *   - Wireless: Bluetooth Low Energy (BLE) Nordic UART Service (NUS)
  */
 
 #include <Arduino.h>
@@ -19,29 +16,56 @@
 #include <SPI.h>
 
 // ==============================================================================
-// ADXL382 SPI HARDWARE PINOUT (Verified from Carrier Board Traces & Nordic main.c)
-// D0 = P1.04 (Pin 36): SCK (Clock)
-// D1 = P1.05 (Pin 37): MOSI (Master Out Slave In)
-// D2 = P1.06 (Pin 38): MISO (Master In Slave Out)
-// D3 = P1.07 (Pin 39): CS (Chip Select for ADXL382)
-// D5 = P1.11 (Pin 11): LOAD_SWITCH (Power Enable for Carrier Board Sensors)
+// HARDWARE PINOUT (Verified from Carrier Board Traces & Gerber Schematics)
 // ==============================================================================
+// Power Gate:
+// D5 = P1.11: LOAD_SWITCH (Powers both ADXL382 and ADS1220 sensor rails)
+#if defined(D5)
+#define PIN_LOAD_SWITCH    D5
+#else
+#define PIN_LOAD_SWITCH    5
+#endif
 
+// ADXL382 SPI Interface (Left Pins):
+// D0 = P1.04: SCK (Clock)
+// D1 = P1.05: MOSI (Master Out Slave In)
+// D2 = P1.06: MISO (Master In Slave Out)
+// D3 = P1.07: CS (Chip Select for ADXL382)
 #if defined(D0)
 #define PIN_ADXL_SCK       D0
 #define PIN_ADXL_MOSI      D1
 #define PIN_ADXL_MISO      D2
 #define PIN_ADXL_CS        D3
-#define PIN_LOAD_SWITCH    D5
 #else
 #define PIN_ADXL_SCK       0
 #define PIN_ADXL_MOSI      1
 #define PIN_ADXL_MISO      2
 #define PIN_ADXL_CS        3
-#define PIN_LOAD_SWITCH    5
 #endif
 
-// Exact ADXL382 Register Addresses (from 07_BLE/Nordic/src/adxl382.h)
+// ADS1220 SPI Interface (Right Pins - PT100 RTD Probe):
+// D6  = P1.12: DRDY (Data Ready)
+// D7  = P1.13: CS (Chip Select for ADS1220)
+// D8  = P1.14: SCLK (Clock)
+// D9  = P1.15: MISO / DOUT
+// D10 = P1.16: MOSI / DIN
+#if defined(D7)
+#define PIN_ADS_CS         D7
+#define PIN_ADS_SCK        D8
+#define PIN_ADS_MISO       D9
+#define PIN_ADS_MOSI       D10
+#define PIN_ADS_DRDY       D6
+#else
+#define PIN_ADS_CS         7
+#define PIN_ADS_SCK        8
+#define PIN_ADS_MISO       9
+#define PIN_ADS_MOSI       10
+#define PIN_ADS_DRDY       6
+#endif
+
+// ==============================================================================
+// ADXL382 REGISTERS
+// ==============================================================================
 #define ADXL38X_DEVID_AD   0x00 // Returns 0xAD
 #define ADXL38X_DEVID_MST  0x01 // Returns 0x1D
 #define ADXL38X_PART_ID    0x02 // Returns 0x17
@@ -58,8 +82,9 @@
 #define ADXL38X_REG_RESET  0x2A // Soft Reset: 0x52
 
 static bool s_adxl382Detected = false;
+static bool s_ads1220Detected = false;
 
-// Direct Hardware SPI Transceiver for Carrier Board ADXL382 Pins (D0, D1, D2, D3)
+// Direct Bit-Banged SPI Transceiver for ADXL382
 static inline uint8_t adxl_spi_transfer(uint8_t data_out) {
   uint8_t data_in = 0;
   for (int i = 7; i >= 0; i--) {
@@ -106,22 +131,78 @@ static void adxl_read_multi(uint8_t start_reg, uint8_t* dest, size_t count) {
   for (volatile int d = 0; d < 8; d++) __NOP();
 }
 
-// ==========================================
+// ==============================================================================
+// ADS1220 SPI DRIVER (PT100 RTD 24-bit ADC)
+// ==============================================================================
+static inline uint8_t ads_spi_transfer(uint8_t data_out) {
+  uint8_t data_in = 0;
+  for (int i = 7; i >= 0; i--) {
+    digitalWrite(PIN_ADS_MOSI, (data_out & (1 << i)) ? HIGH : LOW);
+    for (volatile int d = 0; d < 8; d++) __NOP();
+    digitalWrite(PIN_ADS_SCK, HIGH);
+    for (volatile int d = 0; d < 8; d++) __NOP();
+    if (digitalRead(PIN_ADS_MISO)) {
+      data_in |= (1 << i);
+    }
+    digitalWrite(PIN_ADS_SCK, LOW);
+    for (volatile int d = 0; d < 8; d++) __NOP();
+  }
+  return data_in;
+}
+
+static void ads_send_cmd(uint8_t cmd) {
+  digitalWrite(PIN_ADS_CS, LOW);
+  for (volatile int d = 0; d < 8; d++) __NOP();
+  ads_spi_transfer(cmd);
+  digitalWrite(PIN_ADS_CS, HIGH);
+  for (volatile int d = 0; d < 8; d++) __NOP();
+}
+
+static void ads_write_reg(uint8_t reg, uint8_t val) {
+  digitalWrite(PIN_ADS_CS, LOW);
+  for (volatile int d = 0; d < 8; d++) __NOP();
+  ads_spi_transfer(0x40 | ((reg & 0x03) << 2)); // WREG command
+  ads_spi_transfer(val);
+  digitalWrite(PIN_ADS_CS, HIGH);
+  for (volatile int d = 0; d < 8; d++) __NOP();
+}
+
+static float readExternalPT100() {
+  if (!s_ads1220Detected) return -999.0f;
+
+  digitalWrite(PIN_ADS_CS, LOW);
+  for (volatile int d = 0; d < 8; d++) __NOP();
+  uint8_t b0 = ads_spi_transfer(0x00);
+  uint8_t b1 = ads_spi_transfer(0x00);
+  uint8_t b2 = ads_spi_transfer(0x00);
+  digitalWrite(PIN_ADS_CS, HIGH);
+  for (volatile int d = 0; d < 8; d++) __NOP();
+
+  int32_t raw24 = ((int32_t)b0 << 16) | ((int32_t)b1 << 8) | b2;
+  if (raw24 & 0x800000) raw24 |= 0xFF000000; // Sign extension
+
+  // Rref = 1000 ohms (Rref1 marked 1001 on PCB)
+  // Ratiometric RTD formula: R_RTD = (Code / 2^23) * 2 * Rref
+  if (raw24 <= 0 || raw24 >= 0x7FFFF0) {
+    return -999.0f; // Invalid / disconnected
+  }
+
+  float r_rtd = ((float)raw24 / 8388608.0f) * 2000.0f;
+  // PT100 temperature: R = 100 * (1 + 0.00385 * T)
+  if (r_rtd >= 70.0f && r_rtd <= 250.0f) {
+    float tempC = (r_rtd - 100.0f) / 0.385f;
+    return tempC;
+  }
+  return -999.0f;
+}
+
+// ==============================================================================
 // CONFIGURATION & TIMINGS
-// ==========================================
-// Unique Sensor / Asset Identification:
-// - Set to "auto" (default): The board reads its unique hardware chip ID / MAC address
-//   so every physical XIAO board automatically gets a distinct ID (e.g., "xiao-7a2b")
-//   and distinct name (e.g., "Sensor Node (7A2B)") on the dashboard.
-// - Or set to any custom machine name (e.g., "test-rig-b", "motor-02", "pump-drive").
+// ==============================================================================
 #define ASSET_ID    "auto"
 #define ASSET_NAME  "auto"
 #define BAUD_RATE   115200
-
-// Duty cycle: continuous active burst for test bench monitoring
-#define BURST_DURATION_MS   10000UL      // 10 seconds burst
-#define SLEEP_DURATION_SEC  3ULL         // 3 seconds sleep
-#define SAMPLE_INTERVAL_MS  500UL        // 500ms sample rate (2 Hz) for smooth dashboard animation
+#define SAMPLE_INTERVAL_MS 500UL // 2 Hz live streaming
 
 #if defined(ARDUINO_ARCH_NRF54L15CLEAN)
 #include <nrf54l15_hal_ficr.h>
@@ -138,10 +219,9 @@ static bool s_bleStarted = false;
 #define HAS_BLE 0
 #endif
 
-// ==========================================
+// ==============================================================================
 // HARDWARE IDENTITY DETECTION
-// ==========================================
-
+// ==============================================================================
 static char g_uniqueId[28] = {0};
 static char g_friendlyName[48] = {0};
 
@@ -193,11 +273,6 @@ const char* getBoardFriendlyName(const char* uniqueId) {
   return g_friendlyName;
 }
 
-// ==========================================
-// SENSOR READING HELPERS
-// ==========================================
-
-// Read battery state of charge (percentage from coin-cell voltage)
 int readBatteryPercentage() {
 #if defined(PIN_VBAT_EN) && defined(PIN_VBAT_READ)
   pinMode(PIN_VBAT_EN, OUTPUT);
@@ -213,27 +288,19 @@ int readBatteryPercentage() {
 #endif
 }
 
-// ==========================================
-// UNIFIED SENSOR ACQUISITION (Single Burst Read — No Mode Switching)
-// ==========================================
-// DIG_EN = 0xF0 (XYZT all channels enabled) is set once in setup() and never changed.
-// This avoids bit-banged SPI mode-switching corruption that caused:
-//   - Temperature stuck at fallback (23.8 °C)
-//   - Shaft speed stuck at 1480 RPM (gravity filter corrupted by transients)
-//   - Acceleration showing 0.00 (stale data after mode switch)
-
-static float s_smoothTemp = 23.0f;    // EMA-smoothed temperature (°C)
+// ==============================================================================
+// ACTIVE SENSOR ACQUISITION & KINEMATICS
+// ==============================================================================
+static float s_smoothTemp = 24.0f;
 static bool  s_tempInitialized = false;
-static uint16_t s_tempWarmup = 0;     // Count samples before trusting temp ADC
 
-// DC Gravity EMA tracker (persists across calls)
+// DC Gravity EMA tracker
 static float s_gravX = 0.0f;
 static float s_gravY = 0.0f;
 static uint16_t s_gravSampleCount = 0;
 
 void readAllSensors(float &vx, float &vy, float &ax, float &ay, int &rpm, float &temp) {
-  // Single burst read: registers 0x15–0x1C (8 bytes contiguous)
-  // [XDATA_H, XDATA_L, YDATA_H, YDATA_L, ZDATA_H, ZDATA_L, TDATA_H, TDATA_L]
+  // 1. Read ADXL382 Registers 0x15–0x1C (8 bytes contiguous)
   uint8_t raw[8] = {0};
   adxl_read_multi(ADXL38X_XDATA_H, raw, 8);
 
@@ -241,27 +308,23 @@ void readAllSensors(float &vx, float &vy, float &ax, float &ay, int &rpm, float 
   int16_t rawX = (int16_t)((raw[0] << 8) | raw[1]);
   int16_t rawY = (int16_t)((raw[2] << 8) | raw[3]);
 
-  // ADXL382 15g Range: 2000 LSB/g (from adxl382.h ADXL382_ACC_SENSITIVITY)
+  // ADXL382 15g Range: 2000 LSB/g -> m/s²
   float raw_ax = ((float)rawX / 2000.0f) * 9.80665f;
   float raw_ay = ((float)rawY / 2000.0f) * 9.80665f;
 
-  // DC Gravity Tracking (EMA high-pass filter):
-  // Separates static 1g gravitational tilt from dynamic AC vibration.
-  // First 5 samples: seed the gravity estimate with a running average.
-  // After warmup: EMA with alpha=0.02 (very slow, rejects all vibration).
+  // DC Gravity Isolation (removes 1g gravitational tilt vector)
   s_gravSampleCount++;
   if (s_gravSampleCount <= 5) {
-    // Seed phase: accumulate and average
     float alpha = 1.0f / (float)s_gravSampleCount;
     s_gravX = s_gravX * (1.0f - alpha) + raw_ax * alpha;
     s_gravY = s_gravY * (1.0f - alpha) + raw_ay * alpha;
   } else {
-    // Steady-state EMA: alpha=0.02 gives ~25 second time constant at 2 Hz
-    s_gravX = 0.98f * s_gravX + 0.02f * raw_ax;
-    s_gravY = 0.98f * s_gravY + 0.02f * raw_ay;
+    // Steady-state slow EMA: alpha=0.03
+    s_gravX = 0.97f * s_gravX + 0.03f * raw_ax;
+    s_gravY = 0.97f * s_gravY + 0.03f * raw_ay;
   }
 
-  // Pure dynamic AC vibration acceleration (DC gravity completely removed)
+  // Pure dynamic AC vibration acceleration
   float dynX = raw_ax - s_gravX;
   float dynY = raw_ay - s_gravY;
   float dynamicMotion = sqrtf(dynX * dynX + dynY * dynY);
@@ -269,58 +332,56 @@ void readAllSensors(float &vx, float &vy, float &ax, float &ay, int &rpm, float 
   ax = dynX;
   ay = dynY;
 
-  // Velocity from dynamic acceleration: v = |a_dyn| / (2 * pi * f_shaft)
-  // f_shaft = 25 Hz (test rig nominal: 1480 RPM / 60 = 24.67 Hz ≈ 25 Hz)
+  // Velocity integration: v = |a_dyn| / (2 * pi * f_shaft) at nominal 25 Hz shaft frequency
   const float twoPiF = 2.0f * 3.14159f * 25.0f;
-  // Compute velocity directly from dynamic acceleration (no artificial floor)
   vx = fabs(dynX) / twoPiF;
   vy = fabs(dynY) / twoPiF;
 
-  // RPM detection: only after gravity warmup (first 5 samples unreliable)
+  // Dynamic RPM Detection:
+  // When resting on desk (dynamic acceleration < 0.25 m/s²) -> 0 RPM
+  // When physically shaken, moved, or active on test bench -> 1480 RPM
   if (s_gravSampleCount <= 5) {
-    rpm = 0; // Warmup: report stopped
+    rpm = 0;
   } else if (dynamicMotion >= 0.25f) {
-    rpm = 1480; // Active vibration detected
+    rpm = 1480;
   } else {
-    rpm = 0;    // Stationary on bench
+    rpm = 0;
   }
 
-  // ---- TEMPERATURE (from TDATA_H / TDATA_L in the same burst) ----
-  uint16_t raw16T = ((uint16_t)raw[6] << 8) | raw[7];
-  uint16_t raw12T = raw16T >> 4; // 12-bit right-justified
-
-  // Skip first 10 samples: thermal ADC needs ~5 seconds to stabilize after power-on
-  s_tempWarmup++;
-  if (s_tempWarmup <= 10) {
-    temp = s_smoothTemp;
-    return;
-  }
-
-  // Accept any raw12 in realistic physical range: 50–2000 counts (-24 °C to 167 °C)
-  // Formula: T = (raw12 - 295) / 10.2   (Offset=295 LSB at 0°C, Scale=10.2 LSB/°C)
-  if (raw12T >= 50 && raw12T <= 2000) {
-    float tempC = ((float)((int32_t)raw12T - 295)) / 10.2f;
-
-    // EMA smoothing: alpha=0.15 gives responsive but stable temperature tracking
+  // 2. ---- TEMPERATURE ACQUISITION ----
+  // First check external PT100 probe via ADS1220
+  float pt100 = readExternalPT100();
+  if (pt100 >= -20.0f && pt100 <= 150.0f) {
     if (!s_tempInitialized) {
-      s_smoothTemp = tempC;
+      s_smoothTemp = pt100;
       s_tempInitialized = true;
     } else {
-      s_smoothTemp = 0.85f * s_smoothTemp + 0.15f * tempC;
+      s_smoothTemp = 0.80f * s_smoothTemp + 0.20f * pt100;
     }
     temp = s_smoothTemp;
   } else {
-    // Invalid ADC sample: hold previous smoothed value (no fallback to hardcoded constant)
-    temp = s_smoothTemp;
+    // Fall back to ADXL382 on-chip thermal sensor
+    uint16_t raw16T = ((uint16_t)raw[6] << 8) | raw[7];
+    uint16_t raw12T = raw16T >> 4; // 12-bit
+    if (raw12T >= 50 && raw12T <= 2000) {
+      float tempC = ((float)((int32_t)raw12T - 295)) / 10.2f;
+      if (!s_tempInitialized) {
+        s_smoothTemp = tempC;
+        s_tempInitialized = true;
+      } else {
+        s_smoothTemp = 0.85f * s_smoothTemp + 0.15f * tempC;
+      }
+      temp = s_smoothTemp;
+    } else {
+      temp = s_smoothTemp;
+    }
   }
 }
 
-// ==========================================
-// SYSTEM ENTRY & BURST EXECUTION
-// ==========================================
-
+// ==============================================================================
+// PAYLOAD FORMATTING & TRANSMISSION
+// ==============================================================================
 static void formatFloat(char* dest, size_t destSize, float val, int decimals) {
-  // Handle negative values: emit '-' prefix for values between -1.0 and 0.0
   bool neg = (val < 0.0f);
   if (neg) val = -val;
   int intPart = (int)val;
@@ -328,7 +389,7 @@ static void formatFloat(char* dest, size_t destSize, float val, int decimals) {
   int multiplier = 1;
   for (int i = 0; i < decimals; i++) multiplier *= 10;
   int fracPart = (int)(diff * multiplier + 0.5f);
-  if (fracPart >= multiplier) { intPart++; fracPart = 0; } // Handle rounding overflow
+  if (fracPart >= multiplier) { intPart++; fracPart = 0; }
   if (neg) {
     snprintf(dest, destSize, "-%d.%0*d", intPart, decimals, fracPart);
   } else {
@@ -351,12 +412,12 @@ static void emitTelemetryPayload(const char* assetId, const char* assetName, flo
 
   if (n <= 0) return;
 
-  // 1. Output to USB Serial if physical USB cable is connected
+  // 1. USB Serial output
   if (Serial) {
     Serial.write((const uint8_t*)buf, (size_t)n);
   }
 
-  // 2. Output to Bluetooth LE if central connected and subscribed
+  // 2. Bluetooth LE output
 #if HAS_BLE
   if (Bluefruit.connected() && bleuart.notifyEnabled()) {
     bleuart.write((const uint8_t*)buf, (size_t)n);
@@ -382,15 +443,18 @@ void disconnectCallback(uint16_t conn_handle, uint8_t reason) {
 }
 #endif
 
+// ==============================================================================
+// SETUP & MAIN LOOP
+// ==============================================================================
 void setup() {
   Serial.begin(BAUD_RATE);
 
-  // 1. CRITICAL: Power ON carrier board sensors via hardware load switch on Pin D5 (P1.11)
+  // 1. Power ON carrier board sensors via hardware load switch on Pin D5 (P1.11)
   pinMode(PIN_LOAD_SWITCH, OUTPUT);
   digitalWrite(PIN_LOAD_SWITCH, HIGH);
-  delay(150); // Wait 150ms for sensor power rail to stabilize (as in Nordic reference)
+  delay(150); // Sensor power rail stabilization
 
-  // 2. Configure dedicated SPI GPIOs on Carrier Board (D0=SCK, D1=MOSI, D2=MISO, D3=CS)
+  // 2. Configure ADXL382 SPI pins (D0=SCK, D1=MOSI, D2=MISO, D3=CS)
   pinMode(PIN_ADXL_CS, OUTPUT);
   digitalWrite(PIN_ADXL_CS, HIGH);
   pinMode(PIN_ADXL_SCK, OUTPUT);
@@ -399,30 +463,43 @@ void setup() {
   digitalWrite(PIN_ADXL_MOSI, LOW);
   pinMode(PIN_ADXL_MISO, INPUT);
 
-  // 3. Software reset command (0x52 to 0x2A)
+  // 3. Reset and configure ADXL382
   adxl_write_reg(ADXL38X_REG_RESET, 0x52);
   delay(20);
 
-  // 4. Probe ADXL382 Device ID (Register 0x00: expect 0xAD, Register 0x01: expect 0x1D)
-  uint8_t devId = adxl_read_reg(ADXL38X_DEVID_AD);
-  uint8_t devMst = adxl_read_reg(ADXL38X_DEVID_MST);
-
-  // 5. Configure ADXL382 registers unconditionally (from 07_BLE/Nordic)
-  adxl_write_reg(ADXL38X_OP_MODE, 0x00); // Standby to safely configure registers
+  adxl_write_reg(ADXL38X_OP_MODE, 0x00); // Standby
   delay(5);
-
-  // DIG_EN (0x27): 0xF0 = Enable ALL channels (X + Y + Z + Temperature) permanently
-  // No mode switching ever — single burst reads get all data in one SPI transaction
-  adxl_write_reg(ADXL38X_DIG_EN, 0xF0);
+  adxl_write_reg(ADXL38X_DIG_EN, 0xF0);  // Enable all channels (XYZ + Temperature)
   delay(5);
-
-  // OP_MODE (0x26): 0x0C = High Performance Mode (15g range: bits 7:6 = 0, mode = 12)
-  adxl_write_reg(ADXL38X_OP_MODE, 0x0C);
-  delay(200); // 200ms: thermal ADC requires >100ms to produce first valid temperature sample
-
+  adxl_write_reg(ADXL38X_OP_MODE, 0x0C); // High Performance 15g mode
+  delay(200);
   s_adxl382Detected = true;
 
-  // Resolve dynamic unique identity once at startup
+  // 4. Configure ADS1220 SPI pins (D7=CS, D8=SCK, D9=MISO, D10=MOSI, D6=DRDY)
+  pinMode(PIN_ADS_CS, OUTPUT);
+  digitalWrite(PIN_ADS_CS, HIGH);
+  pinMode(PIN_ADS_SCK, OUTPUT);
+  digitalWrite(PIN_ADS_SCK, LOW);
+  pinMode(PIN_ADS_MOSI, OUTPUT);
+  digitalWrite(PIN_ADS_MOSI, LOW);
+  pinMode(PIN_ADS_MISO, INPUT);
+  pinMode(PIN_ADS_DRDY, INPUT);
+
+  // Initialize ADS1220 for 3-wire PT100 RTD
+  ads_send_cmd(0x06); // RESET
+  delay(10);
+  ads_write_reg(0x00, 0x00); // MUX: AIN0-AIN1, Gain=1
+  delay(2);
+  ads_write_reg(0x01, 0x04); // DR: 20 SPS, Continuous mode
+  delay(2);
+  ads_write_reg(0x02, 0x7D); // REFP0/REFN0 external ref, 50/60Hz filter, IDAC=500uA
+  delay(2);
+  ads_write_reg(0x03, 0x48); // IDAC1 -> AIN0, IDAC2 -> AIN1
+  delay(2);
+  ads_send_cmd(0x08);        // START/SYNC
+  s_ads1220Detected = true;
+
+  // 5. Resolve silicon hardware identity
   if (strcmp(g_effectiveAssetId, "auto") == 0 || strlen(g_effectiveAssetId) == 0) {
     g_effectiveAssetId = getUniqueBoardId();
   }
@@ -430,6 +507,7 @@ void setup() {
     g_effectiveAssetName = getBoardFriendlyName(g_effectiveAssetId);
   }
 
+  // 6. Bluetooth LE Advertising & Nordic UART Service
 #if HAS_BLE
   Bluefruit.begin();
   char bleAdvName[32];
@@ -459,27 +537,27 @@ void setup() {
     Serial.print(g_effectiveAssetName);
     Serial.print(" (ID: ");
     Serial.print(g_effectiveAssetId);
-    Serial.print(s_adxl382Detected ? ", ADXL382 Connected (0xAD)" : ", Standby Kinematics");
-    Serial.println("). Starting continuous telemetry...\"}");
+    Serial.println("). Starting continuous live telemetry...\"}");
   }
 }
 
 static unsigned long lastSampleTime = 0;
 
 void loop() {
-  unsigned long currentMillis = millis();
+  unsigned long now = millis();
 
-  if (currentMillis - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-    lastSampleTime = currentMillis;
+  if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+    lastSampleTime = now;
 
-    float vibX = 0.0f, vibY = 0.0f;
-    float accelX = 0.0f, accelY = 0.0f;
+    float vx = 0.0f, vy = 0.0f;
+    float ax = 0.0f, ay = 0.0f;
     float temp = 0.0f;
     int rpm = 0;
-    readAllSensors(vibX, vibY, accelX, accelY, rpm, temp);
-    int batteryPct = readBatteryPercentage();
 
-    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vibX, vibY, accelX, accelY, temp, rpm, batteryPct);
+    readAllSensors(vx, vy, ax, ay, rpm, temp);
+    int battery = readBatteryPercentage();
+
+    emitTelemetryPayload(g_effectiveAssetId, g_effectiveAssetName, vx, vy, ax, ay, temp, rpm, battery);
   }
 
   yield();

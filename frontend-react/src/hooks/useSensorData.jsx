@@ -234,17 +234,14 @@ export default function useSensorData(activeAsset = '', onAutoSelectLiveAsset = 
 
               assetKpisMapRef.current[incomingId] = nextKpis;
 
-              // Auto-focus switcher: If current active asset is empty or offline, automatically lock onto live streaming sensor
+              // Auto-focus switcher: ONLY lock onto live sensor if NO asset is currently selected at all
               const currentActive = activeAssetRef.current;
-              const currentLastSeen = assetLastPacketTimeRef.current[currentActive] || 0;
-              const isCurrentLive = Boolean(currentActive && currentLastSeen > 0 && (Date.now() - currentLastSeen) <= 3500);
-
-              if (!isCurrentLive && onAutoSelectRef.current && currentActive !== incomingId) {
+              if (!currentActive && onAutoSelectRef.current) {
                 onAutoSelectRef.current(incomingId);
               }
 
-              // Update live active UI state if this packet matches the currently selected machine OR if the current machine was offline
-              if (incomingId === activeAssetRef.current || !isCurrentLive) {
+              // Update live active UI state ONLY if this packet matches the currently selected machine
+              if (incomingId === activeAssetRef.current) {
                 setConnectionMode('live');
                 setIsConnected(true);
                 setData(nextData);
