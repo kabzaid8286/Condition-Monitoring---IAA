@@ -326,13 +326,106 @@ async def run_ble_mode(mqtt_client, args):
             await asyncio.sleep(3)
 
 
+async def run_serial_worker(mqtt_client, args):
+    """
+    Asynchronous USB Serial ingestion worker.
+    Continuously checks for connected Seeed Studio XIAO microcontrollers on USB,
+    reads line-by-line JSON telemetry, processes kinematics, and publishes to MQTT.
+    """
+    import serial
+    print("🔌 [Serial Gateway] Monitoring for Seeed Studio XIAO USB connections...")
+    
+    while True:
+        target_port = args.serial_port or find_serial_port()
+        if not target_port:
+            await asyncio.sleep(2)
+            continue
+
+        try:
+            print(f"🔌 [Serial Gateway] Detected microcontroller on {target_port}. Connecting at {args.baud} baud...")
+            ser = serial.Serial(target_port, args.baud, timeout=1.0)
+            await asyncio.sleep(1.0)
+            print(f"✅ [Serial Gateway] Connected to Seeed Studio XIAO on {target_port}!")
+
+            loop = asyncio.get_running_loop()
+            while True:
+                line = await loop.run_in_executor(None, ser.readline)
+                if not line:
+                    await asyncio.sleep(0.01)
+                    continue
+
+                line_str = line.decode('utf-8', errors='replace').strip()
+                if not line_str:
+                    continue
+
+                if line_str.startswith("{") and line_str.endswith("}"):
+                    try:
+                        data = json.loads(line_str)
+                        if data.get("burst_state") == "sleep":
+                            continue
+
+                        asset_id = str(data.get("asset_id") or data.get("id") or args.asset).strip()
+                        asset_name = str(data.get("name") or data.get("asset_name") or asset_id.replace('-', ' ').title()).strip()
+                        raw_vx = float(data.get("vibration_x") if data.get("vibration_x") is not None else data.get("vx", data.get("vib_x", 0.0)))
+                        raw_vy = float(data.get("vibration_y") if data.get("vibration_y") is not None else data.get("vy", data.get("vib_y", 0.0)))
+                        explicit_ax = data.get("accel_x") or data.get("ax")
+                        explicit_ay = data.get("accel_y") or data.get("ay")
+                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay)
+
+                        readings = {
+                            "vibration_x": kinematics["vibration_x"],
+                            "vibration_y": kinematics["vibration_y"],
+                            "accel_x": kinematics["accel_x"],
+                            "accel_y": kinematics["accel_y"],
+                            "accel_g": kinematics["accel_g"],
+                            "temperature": float(data.get("temperature") if data.get("temperature") is not None else data.get("temp", data.get("t", 0.0))),
+                            "rpm": float(data["rpm"]) if "rpm" in data else 0.0,
+                            "battery_pct": int(data.get("battery_pct") if data.get("battery_pct") is not None else data.get("bat", data.get("battery", 100))),
+                            "sample_rate_hz": kinematics["sample_rate_hz"],
+                            "burst_state": str(data.get("burst_state", "active"))
+                        }
+
+                        topic = f"sensors/{asset_id}/telemetry"
+                        payload = {
+                            "asset_id": asset_id,
+                            "asset_name": asset_name,
+                            "name": asset_name,
+                            "gateway_id": args.gateway_id,
+                            "transport": "usb_serial",
+                            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "sensors": readings,
+                            "quality": 100
+                        }
+                        mqtt_client.publish(topic, json.dumps(payload), qos=0)
+                        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [USB-SERIAL] [{asset_id} ({asset_name})] VelX: {readings['vibration_x']:.4f} m/s | AccelX: {readings['accel_x']:.2f} m/s² | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}% (12.8 kHz)")
+                    except Exception as err:
+                        print(f"[SERIAL-WARN] Incomplete packet ({err}): {line_str}")
+                else:
+                    print(f"[XIAO LOG] {line_str}")
+        except Exception as e:
+            print(f"[SERIAL-ERR] Connection lost on {target_port}: {e}. Retrying in 2s...")
+            await asyncio.sleep(2)
+
+
+async def run_auto_mode(mqtt_client, args):
+    """
+    Concurrent Auto Mode: Runs both USB Serial detection and BLE Wireless ingestion simultaneously.
+    Allows zero-configuration hardware connectivity (cable or battery).
+    """
+    print("🚀 [Gateway] Starting Auto Dual Mode (USB Serial + BLE Wireless Ingestion)...")
+    await asyncio.gather(
+        run_serial_worker(mqtt_client, args),
+        run_ble_mode(mqtt_client, args)
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Raspberry Pi 5 / PC Condition Monitoring Telemetry Gateway")
     parser.add_argument("--host", default=DEFAULT_BROKER_HOST, help="MQTT Broker Host (default: localhost)")
     parser.add_argument("--port", type=int, default=DEFAULT_BROKER_PORT, help="MQTT Broker Port (default: 1883)")
     parser.add_argument("--asset", default="test-rig-a", help="Monitored Asset ID fallback (default: test-rig-a or auto-detected from microcontroller)")
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SEC, help="Publish interval in seconds (default: 1.0)")
-    parser.add_argument("--mode", default="simulation", choices=["simulation", "serial", "ble"], help="Data mode: 'simulation', 'serial' (USB Seeed Studio XIAO), or 'ble' (Wireless Bluetooth)")
+    parser.add_argument("--mode", default="auto", choices=["auto", "ble", "serial", "simulation"], help="Data mode: 'auto' (Concurrent USB Serial + BLE), 'ble' (Wireless Bluetooth), 'serial' (USB only), or 'simulation'")
     parser.add_argument("--serial-port", default=None, help="Explicit USB serial port (e.g. /dev/cu.usbmodem1101 or /dev/ttyACM0). Auto-detects if omitted.")
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD_RATE, help="Serial baud rate (default: 115200)")
     parser.add_argument("--gateway-id", default=DEFAULT_GATEWAY_ID, help="Gateway identifier")
@@ -359,6 +452,17 @@ def main():
         except Exception as e:
             print(f"⚠️ Waiting for Mosquitto broker ({e}). Retrying in 2s...")
             time.sleep(2)
+
+    # Dispatch to Auto Dual Mode (Concurrent Serial + BLE)
+    if args.mode == "auto":
+        try:
+            asyncio.run(run_auto_mode(client, args))
+        except KeyboardInterrupt:
+            print("\n🛑 Gateway stopped by user.")
+        finally:
+            client.loop_stop()
+            client.disconnect()
+        return
 
     # Dispatch to Bluetooth Low Energy async mode
     if args.mode == "ble":

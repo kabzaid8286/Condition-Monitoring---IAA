@@ -58,8 +58,8 @@ class TelemetryHub:
             sensors = payload.get("sensors", {})
 
             previous = self.latest_readings.get(asset_id, {})
-            raw_vx = float(sensors.get("vibration_x", 0.0))
-            raw_temp = float(sensors.get("temperature", 0.0))
+            raw_vx = float(sensors.get("vibration_x") if sensors.get("vibration_x") is not None else sensors.get("vx", 0.0))
+            raw_temp = float(sensors.get("temperature") if sensors.get("temperature") is not None else sensors.get("temp", sensors.get("t", 0.0)))
             burst_st = str(sensors.get("burst_state", "active"))
 
             # Retain last valid readings during duty-cycle sleep so dashboard never zeroes out
@@ -72,11 +72,11 @@ class TelemetryHub:
                 rp = previous.get("rpm", 0.0)
             else:
                 vx = raw_vx
-                vy = float(sensors.get("vibration_y", 0.0))
-                ax = float(sensors.get("ax", 0.0))
-                ay = float(sensors.get("accel_y", 0.0))
+                vy = float(sensors.get("vibration_y") if sensors.get("vibration_y") is not None else sensors.get("vy", 0.0))
+                ax = float(sensors.get("accel_x") if sensors.get("accel_x") is not None else sensors.get("ax", 0.0))
+                ay = float(sensors.get("accel_y") if sensors.get("accel_y") is not None else sensors.get("ay", 0.0))
                 tp = raw_temp
-                rp = float(sensors["rpm"]) if "rpm" in sensors else 0.0
+                rp = float(sensors.get("rpm", 0.0))
 
             data_item = {
                 "asset_id": asset_id,

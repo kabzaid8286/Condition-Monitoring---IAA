@@ -42,6 +42,8 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Implemented discrete numerical derivative $a = \frac{dv}{dt}$ in gateway and backend, displaying live Acceleration (m/s² and g) alongside Velocity (m/s).
   - Reconfigured FFT spectrum analyzer for 12.8 kHz high-rate sampling (6.4 kHz Nyquist bandwidth) with bearing defect harmonic bands.
   - Implemented ADXL382 SPI register interface with internal thermal sensor (0.1 °C/LSB) in firmware, replacing synthetic mock sine waves with physical sensor telemetry.
+  - Auto Dual Gateway Ingestion (`--mode auto`): Concurrently runs USB serial reader and BLE wireless scanner in `gateway/rpi_publisher.py` with zero-config auto-detection.
+  - Verified active live wireless physical sensor streaming with hardware node `IAA-xiao-78779ddd` (`Sensor Node (78779DDD)`), delivering real-time dynamic motion, vibration, acceleration, temperature, and shaft RPM.
 
 ## 4. Current Phase & Next Milestones
 - **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:

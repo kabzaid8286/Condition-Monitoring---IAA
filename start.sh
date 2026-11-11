@@ -59,10 +59,10 @@ echo "[3/4] 💻 Starting React Frontend (http://localhost:5173)..."
 (cd frontend-react && npm run dev -- --host) &
 FRONTEND_PID=$!
 
-# 5. Start Wireless BLE Ingestion Daemon
+# 5. Start Wireless BLE & USB Serial Auto Ingestion Daemon
 echo ""
-echo "[4/4] 📡 Starting Bluetooth LE Gateway Ingestion..."
-.venv/bin/python3 gateway/rpi_publisher.py --mode ble &
+echo "[4/4] 📡 Starting Auto Dual Gateway Ingestion (USB Serial + BLE Wireless)..."
+.venv/bin/python3 gateway/rpi_publisher.py --mode auto &
 GATEWAY_PID=$!
 
 echo ""
