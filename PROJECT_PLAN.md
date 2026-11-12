@@ -64,6 +64,11 @@
 - [x] **Continuous 2 Hz Telemetry**: Restored continuous active sensor acquisition in `xiao_condition_node.ino` calling `readAllSensors()`, enabling dynamic acceleration, velocity integration, and motion-based RPM detection.
 - [x] **ADS1220 24-bit ADC & PT100 Temperature Probe**: Integrated SPI driver for Texas Instruments ADS1220 (D6-D10) reading the 3-wire PT100 RTD probe connected to J2 terminal block with automatic fallback to ADXL382 on-chip thermal sensor.
 
+## Phase 5.8: Precision PT100 Callendar-Van Dusen & Ratiometric Signal Chain (Completed)
+- [x] **IEC 60751 Callendar-Van Dusen Conversion**: Integrated high-precision Newton-Raphson solver for sub-0.1 °C temperature conversion across -200 °C to +850 °C ($A = 3.9083 \times 10^{-3}$, $B = -5.775 \times 10^{-7}$, $C = -4.183 \times 10^{-12}$).
+- [x] **Hardware Ratiometric Signal Chain**: Configured $R_{REF} = 1650\,\Omega$ and Gain = 8 ratiometric formula, shared SPI bus architecture (D0=SCK, D1=MOSI, D2=MISO, D7=CS), and Core 1.0.22 10-bit battery divider ADC diagnostics.
+- [x] **Kinematics Transient Protection**: Eliminated false disconnect dropouts and flatlines during sensor movement/tilting by adding resilient temperature smoothing and active burst state validation in `LiveTelemetryView.jsx`.
+
 ## Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)
 *Goal: Deploy the gateway daemon to the Raspberry Pi 5 mounted on the test rig to decouple the system from the Mac completely.*
 - [ ] **Transfer Gateway Code**: Sync `gateway/rpi_publisher.py` and requirements (`paho-mqtt`, `bleak`, `pyserial`) to the Raspberry Pi 5.
