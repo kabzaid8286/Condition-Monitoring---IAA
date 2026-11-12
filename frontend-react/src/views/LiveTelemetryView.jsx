@@ -216,9 +216,10 @@ function FFTCanvas({ tickCount, isLive, lastVib = 0 }) {
 }
 
 export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = false }) {
-  const isLive = isConnected && (parseFloat(kpis?.vibRms || 0) > 0 || parseFloat(kpis?.temp || 0) > 0 || parseInt(kpis?.rpm || 0) > 0);
+  // A node is considered live if WebSocket is connected and telemetry packets are actively arriving
+  const isLive = isConnected && kpis?.burstState !== 'offline';
 
-  // When disconnected: all gauges strictly drop to zero
+  // Live telemetry readings
   const lastVib = isLive ? (parseFloat(kpis?.vibRms) || 0) : 0;
   const lastAccel = isLive ? (parseFloat(kpis?.accelRms) || 0) : 0;
   const lastTemp = isLive ? (parseFloat(kpis?.temp) || 0) : 0;

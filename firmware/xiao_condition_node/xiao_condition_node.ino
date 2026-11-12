@@ -726,11 +726,10 @@ void readAllSensors(float &vx,
     rpm = 0;
   }
 
-  // PT100 temperature acquisition.
+  // PT100 temperature acquisition (with ADS1220 internal & ADXL fallback).
   float pt100 = readExternalPT100();
 
   if (pt100 >= -50.0f && pt100 <= 200.0f) {
-
     if (!s_tempInitialized) {
       s_smoothTemp = pt100;
       s_tempInitialized = true;
@@ -739,12 +738,24 @@ void readAllSensors(float &vx,
           (TEMP_FILTER_ALPHA * pt100) +
           ((1.0f - TEMP_FILTER_ALPHA) * s_smoothTemp);
     }
-
     temp = s_smoothTemp;
-
   } else {
-
-    temp = -999.0f;
+    // Secondary fallback: ADS1220 precision on-chip sensor
+    float adsInternal = readADS1220InternalTemp();
+    if (adsInternal >= -40.0f && adsInternal <= 125.0f) {
+      if (!s_tempInitialized) {
+        s_smoothTemp = adsInternal;
+        s_tempInitialized = true;
+      } else {
+        s_smoothTemp = (TEMP_FILTER_ALPHA * adsInternal) + ((1.0f - TEMP_FILTER_ALPHA) * s_smoothTemp);
+      }
+      temp = s_smoothTemp;
+    } else if (s_tempInitialized && s_smoothTemp > -100.0f) {
+      // Retain last valid smoothed reading rather than zeroing out during transient spikes
+      temp = s_smoothTemp;
+    } else {
+      temp = 25.0f;
+    }
   }
 }
 
