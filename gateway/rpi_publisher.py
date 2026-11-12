@@ -249,6 +249,9 @@ async def run_ble_mode(mqtt_client, args):
 
                         asset_id = str(payload_json.get("asset_id") or payload_json.get("id") or args.asset).strip()
                         asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
+                        if not hasattr(handle_rx, "_logged"):
+                            handle_rx._logged = True
+                            print(f"🔍 [BLE RAW PACKET] {line}")
                         raw_vx = float(payload_json.get("vibration_x") if payload_json.get("vibration_x") is not None else payload_json.get("vx", payload_json.get("vib_x", 0.0)))
                         raw_vy = float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0)))
                         explicit_ax = payload_json.get("accel_x") or payload_json.get("ax")

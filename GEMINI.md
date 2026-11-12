@@ -48,6 +48,12 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Fixed frontend dropdown glitching: auto-focus now only defaults on empty asset selection; manual machine selection is strictly preserved without snapping back to auto-detected sensor.
   - Restored continuous 2 Hz physical telemetry in firmware calling `readAllSensors()`, enabling dynamic acceleration, velocity integration, and motion-based RPM detection.
   - Integrated Texas Instruments ADS1220 24-bit ADC SPI driver (pins D6-D10) for 3-wire PT100 RTD industrial probe (J2 terminal block) with seamless ADXL382 on-chip thermal fallback.
+- **Phase 5.8: Precision PT100 Callendar-Van Dusen & Ratiometric Signal Chain (Completed)**:
+  - Integrated full Callendar-Van Dusen equation (IEC 60751) with iterative Newton-Raphson solver for sub-0.1 °C temperature conversion across -200 °C to +850 °C.
+  - Configured exact hardware ratiometric reference resistor ($R_{REF} = 1650\,\Omega$) and Gain = 8 ($FSR = 4194304 \times 8$).
+  - Pinpointed and wired shared SPI bus architecture (D0=SCK, D1=MOSI, D2=MISO) with dedicated D7 chip select for ADS1220 and D3 for ADXL382.
+  - Integrated XIAO nRF54L15 Arduino Core 1.0.22 10-bit battery divider ADC diagnostics on P1.14/P1.15.
+  - Enabled direct BLE wireless and USB serial live streaming into dashboard with zero fallback.
 
 ## 4. Current Phase & Next Milestones
 - **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:
