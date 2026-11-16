@@ -1,4 +1,15 @@
+let lastToastMsg = '';
+let lastToastTime = 0;
+
 export function toast(msg, type = 'success') {
+  // Prevent duplicate toast spam (e.g. React StrictMode or rapid double-firing)
+  const now = Date.now();
+  if (msg === lastToastMsg && now - lastToastTime < 500) {
+    return;
+  }
+  lastToastMsg = msg;
+  lastToastTime = now;
+
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
