@@ -273,14 +273,6 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
         borderWidth: 2,
         tension: 0.4,
         pointRadius: 0
-      },
-      {
-        label: 'RPM (scaled)',
-        data: rpm.map(r => (parseFloat(r || 0) / 25).toFixed(2)),
-        borderColor: '#f59e0b',
-        borderWidth: 2,
-        tension: 0.4,
-        pointRadius: 0
       }
     ]
   };
@@ -331,16 +323,6 @@ export default function LiveTelemetryView({ data = {}, kpis = {}, isConnected = 
           color="#10b981"
           warnThreshold={70}
           critThreshold={85}
-        />
-
-        <DialGauge
-          value={lastRpm}
-          min={0}
-          max={3000}
-          decimals={0}
-          unit="RPM"
-          label="SHAFT SPEED"
-          color="#f59e0b"
         />
       </div>
       

@@ -93,11 +93,25 @@ static BLEUart bleuart;
 #endif
 
 // ============================================================================
-// SENSOR CONFIGURATION
+// DYNAMIC RUNTIME SENSOR CONFIGURATION (Adjustable via Dashboard / Serial / BLE)
+// No re-flashing required!
 // ============================================================================
 
 #define BAUD_RATE 115200
-#define SAMPLE_INTERVAL_MS 500UL
+
+// Dynamic sampling rate (Range: 1 Hz to 15,000 Hz)
+static uint32_t s_samplingRateHz = 12800;
+
+// Dynamic telemetry interval (calculated from sampling rate or explicit command)
+static unsigned long s_sampleIntervalMs = 500UL;
+
+// Dynamic duty cycle configuration
+// 0 = continuous, 1 = 10s burst / 3s sleep, 2 = 10s burst / 5m sleep, 3 = 10s burst / 30s window (20s sleep)
+static uint8_t s_dutyCycleMode = 0;
+static unsigned long s_burstActiveDurationMs = 10000UL;
+static unsigned long s_burstCyclePeriodMs = 30000UL;
+static unsigned long s_cycleStartTime = 0;
+static bool s_isStreamingActive = true;
 
 #define ASSET_ID "auto"
 #define ASSET_NAME "auto"
@@ -666,7 +680,6 @@ static bool s_tempInitialized = false;
 
 static float s_gravX = 0.0f;
 static float s_gravY = 0.0f;
-
 static uint16_t s_gravSampleCount = 0;
 
 void readAllSensors(float &vx,
@@ -683,50 +696,42 @@ void readAllSensors(float &vx,
   int16_t rawX = (int16_t)((raw[0] << 8) | raw[1]);
   int16_t rawY = (int16_t)((raw[2] << 8) | raw[3]);
 
-  // ADXL382 15g range: 2000 LSB/g.
+  // ADXL382 15g range: 2000 LSB/g -> m/s²
   float raw_ax = ((float)rawX / 2000.0f) * 9.80665f;
   float raw_ay = ((float)rawY / 2000.0f) * 9.80665f;
 
-  // Gravity isolation.
+  // Adaptive Gravity Tracking:
+  // Initial 5 samples lock the initial mounting orientation.
+  // During regular runtime, adapt with alpha=0.08 to track physical tilting
+  // without subtracting dynamic shock/vibration spikes.
   s_gravSampleCount++;
 
   if (s_gravSampleCount <= 5) {
     float alpha = 1.0f / (float)s_gravSampleCount;
-
     s_gravX = s_gravX * (1.0f - alpha) + raw_ax * alpha;
     s_gravY = s_gravY * (1.0f - alpha) + raw_ay * alpha;
-
   } else {
-
-    s_gravX = 0.97f * s_gravX + 0.03f * raw_ax;
-    s_gravY = 0.97f * s_gravY + 0.03f * raw_ay;
+    // Fast adaptive tilt filter: prevents tilting from permanently offsetting AC vibration
+    s_gravX = 0.92f * s_gravX + 0.08f * raw_ax;
+    s_gravY = 0.92f * s_gravY + 0.08f * raw_ay;
   }
 
-  // Dynamic acceleration.
+  // True dynamic physical acceleration
   float dynX = raw_ax - s_gravX;
   float dynY = raw_ay - s_gravY;
-
-  float dynamicMotion = sqrtf(dynX * dynX + dynY * dynY);
 
   ax = dynX;
   ay = dynY;
 
-  // Vibration velocity approximation at 25 Hz.
+  // Vibration velocity approximation at 25 Hz shaft frequency (ISO 10816: v = |a| / (2*pi*f))
   const float twoPiF = 2.0f * 3.14159f * 25.0f;
-
   vx = fabsf(dynX) / twoPiF;
   vy = fabsf(dynY) / twoPiF;
 
-  // RPM activity estimate (not a direct RPM measurement).
-  if (s_gravSampleCount <= 5) {
-    rpm = 0;
-  } else if (dynamicMotion >= 0.25f) {
-    rpm = 1480;
-  } else {
-    rpm = 0;
-  }
+  // Shaft RPM is disabled for now (will be addressed in a future milestone)
+  rpm = 0;
 
-  // PT100 temperature acquisition (with ADS1220 internal & ADXL fallback).
+  // PT100 temperature acquisition (with ADS1220 internal fallback & EMA smoothing).
   float pt100 = readExternalPT100();
 
   if (pt100 >= -50.0f && pt100 <= 200.0f) {
@@ -734,9 +739,7 @@ void readAllSensors(float &vx,
       s_smoothTemp = pt100;
       s_tempInitialized = true;
     } else {
-      s_smoothTemp =
-          (TEMP_FILTER_ALPHA * pt100) +
-          ((1.0f - TEMP_FILTER_ALPHA) * s_smoothTemp);
+      s_smoothTemp = (TEMP_FILTER_ALPHA * pt100) + ((1.0f - TEMP_FILTER_ALPHA) * s_smoothTemp);
     }
     temp = s_smoothTemp;
   } else {
@@ -1015,6 +1018,99 @@ void setup() {
 }
 
 // ============================================================================
+// DYNAMIC COMMAND PARSER (BLE & SERIAL)
+// Allows changing sampling rate (1-15000 Hz) and duty cycle on the fly!
+// ============================================================================
+
+static void processIncomingCommand(const char *cmdStr) {
+  if (!cmdStr || strlen(cmdStr) < 3) return;
+
+  // Look for sampling_rate or rate
+  const char *rateKey = strstr(cmdStr, "\"rate\":");
+  if (!rateKey) rateKey = strstr(cmdStr, "\"sampling_rate\":");
+  if (rateKey) {
+    long r = atol(rateKey + (strstr(rateKey, ":") - rateKey + 1));
+    if (r >= 1 && r <= 15000) {
+      s_samplingRateHz = (uint32_t)r;
+      if (s_samplingRateHz <= 10) {
+        s_sampleIntervalMs = 1000UL / s_samplingRateHz;
+      } else if (s_samplingRateHz <= 50) {
+        s_sampleIntervalMs = 100UL;
+      } else {
+        s_sampleIntervalMs = 500UL; // Telemetry summary update rate for high-frequency vibration
+      }
+      if (Serial) {
+        Serial.print("{\"log\":\"[CONFIG] Dynamic sampling rate applied: ");
+        Serial.print(s_samplingRateHz);
+        Serial.println(" Hz\"}");
+      }
+    }
+  }
+
+  // Look for duty cycle or schedule
+  if (strstr(cmdStr, "30s_10s") || strstr(cmdStr, "every_30s")) {
+    s_dutyCycleMode = 3;
+    s_burstActiveDurationMs = 10000UL;
+    s_burstCyclePeriodMs = 30000UL;
+  } else if (strstr(cmdStr, "steady") || strstr(cmdStr, "bench")) {
+    s_dutyCycleMode = 1;
+    s_burstActiveDurationMs = 10000UL;
+    s_burstCyclePeriodMs = 13000UL;
+  } else if (strstr(cmdStr, "field") || strstr(cmdStr, "battery")) {
+    s_dutyCycleMode = 2;
+    s_burstActiveDurationMs = 10000UL;
+    s_burstCyclePeriodMs = 300000UL;
+  } else if (strstr(cmdStr, "continuous")) {
+    s_dutyCycleMode = 0;
+  }
+
+  // Look for streaming activation/pause
+  if (strstr(cmdStr, "\"streaming\":false") || strstr(cmdStr, "\"active\":false")) {
+    s_isStreamingActive = false;
+  } else if (strstr(cmdStr, "\"streaming\":true") || strstr(cmdStr, "\"active\":true")) {
+    s_isStreamingActive = true;
+  }
+}
+
+static char s_serialCmdBuf[128];
+static uint8_t s_serialCmdIdx = 0;
+
+static void checkSerialCommands() {
+  while (Serial && Serial.available()) {
+    char c = (char)Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (s_serialCmdIdx > 0) {
+        s_serialCmdBuf[s_serialCmdIdx] = '\0';
+        processIncomingCommand(s_serialCmdBuf);
+        s_serialCmdIdx = 0;
+      }
+    } else if (s_serialCmdIdx < sizeof(s_serialCmdBuf) - 1) {
+      s_serialCmdBuf[s_serialCmdIdx++] = c;
+    }
+  }
+}
+
+#if HAS_BLE
+static char s_bleCmdBuf[128];
+static uint8_t s_bleCmdIdx = 0;
+
+static void checkBleCommands() {
+  while (bleuart.available()) {
+    char c = (char)bleuart.read();
+    if (c == '\n' || c == '\r') {
+      if (s_bleCmdIdx > 0) {
+        s_bleCmdBuf[s_bleCmdIdx] = '\0';
+        processIncomingCommand(s_bleCmdBuf);
+        s_bleCmdIdx = 0;
+      }
+    } else if (s_bleCmdIdx < sizeof(s_bleCmdBuf) - 1) {
+      s_bleCmdBuf[s_bleCmdIdx++] = c;
+    }
+  }
+}
+#endif
+
+// ============================================================================
 // MAIN LOOP
 // ============================================================================
 
@@ -1022,9 +1118,27 @@ static unsigned long lastSampleTime = 0;
 
 void loop() {
 
+  // Process any incoming dynamic config commands
+  checkSerialCommands();
+#if HAS_BLE
+  checkBleCommands();
+#endif
+
   unsigned long now = millis();
 
-  if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+  // Handle duty cycle schedule
+  bool inActiveWindow = true;
+  if (s_dutyCycleMode > 0) {
+    if (s_cycleStartTime == 0) s_cycleStartTime = now;
+    unsigned long elapsed = now - s_cycleStartTime;
+    if (elapsed >= s_burstCyclePeriodMs) {
+      s_cycleStartTime = now;
+      elapsed = 0;
+    }
+    inActiveWindow = (elapsed < s_burstActiveDurationMs);
+  }
+
+  if (s_isStreamingActive && inActiveWindow && (now - lastSampleTime >= s_sampleIntervalMs)) {
 
     lastSampleTime = now;
 

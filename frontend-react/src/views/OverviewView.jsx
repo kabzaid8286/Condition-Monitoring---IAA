@@ -61,7 +61,6 @@ export default function OverviewView({ kpis = {}, data = {} }) {
       <div className="overview-grid" style={{marginTop:"20px"}}>
          <KpiCard title="Vibration RMS" value={kpis?.vibRms ?? '0.0000'} unit="m/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(vibX, '#3b82f6')} trend={isOffline ? "0.0000 • Hardware Disconnected" : (isResting ? "● Accelerometer (Resting)" : "● Live Accelerometer")} trendClass={isOffline ? "neutral" : "up"} />
          <KpiCard title="Bearing Temp (PT100)" value={kpis?.temp ?? '0.0'} unit="°C" colorClass="green" icon={<Thermometer size={18} color="#10b981" />} chartData={getSparklineData(temp, '#10b981')} trend={isOffline ? "0.0 • Sensor Offline" : "● Live Probe (LS5-PT100A-3L-1.0)"} trendClass={isOffline ? "neutral" : "neutral"} />
-         <KpiCard title="Shaft Speed" value={kpis?.rpm ?? 0} unit="RPM" colorClass="amber" icon={<Zap size={18} color="#f59e0b" />} chartData={getSparklineData(rpm, '#f59e0b')} trend={isOffline ? "0 RPM • Motor Stopped" : (kpis?.rpm === 0 ? "0 RPM • Motor Stopped" : "● Live Speed Ingest")} trendClass={isOffline ? "neutral" : "neutral"} />
          <KpiCard title="Anomaly Score" value={isOffline ? '0.00' : (parseFloat(kpis?.vibRms || 0) * 100).toFixed(2)} unit="/1.0" colorClass="rose" icon={<TrendingUp size={18} color="#f43f5e" />} chartData={getSparklineData(vibX.map(v => parseFloat(v || 0) * 100), '#f43f5e')} trend={isOffline ? "0.00 • Model Standby" : "● Live Anomaly Scoring"} trendClass={isOffline ? "neutral" : "down"} />
       </div>
 

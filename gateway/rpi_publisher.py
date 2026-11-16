@@ -23,6 +23,14 @@ import paho.mqtt.client as mqtt
 # Nordic UART Service (NUS) UUIDs
 NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 NUS_TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
+NUS_RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+
+# Per-sensor active control & SD storage settings
+_active_streaming_nodes = set()
+_sdcard_storage_enabled = True
+_sdcard_mount_dir = "sdcard_data"
+_active_serial_conn = None
+_active_ble_clients = {}
 
 # Default Configuration
 DEFAULT_BROKER_HOST = "localhost"
@@ -283,6 +291,7 @@ async def run_ble_mode(mqtt_client, args):
                             "quality": 100
                         }
                         mqtt_client.publish(topic, json.dumps(msg), qos=0)
+                        save_to_sdcard(asset_id, msg)
                         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BLE-WIRELESS] [{asset_id} ({asset_name})] VelX: {readings['vibration_x']:.4f} m/s | AccelX: {readings['accel_x']:.2f} m/s² | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}% (12.8 kHz)")
                     except Exception as err:
                         print(f"[BLE-WARN] Incomplete JSON packet ({err}): {line}")
@@ -293,6 +302,14 @@ async def run_ble_mode(mqtt_client, args):
             print(f"🔗 [BLE] Connecting wirelessly to {name} ({address})...")
             async with BleakClient(address) as client:
                 print(f"✅ [BLE] Connected wirelessly to {name}!")
+                rx_char = None
+                for service in client.services:
+                    for char in service.characteristics:
+                        if char.uuid.lower() == NUS_RX_CHAR_UUID.lower():
+                            rx_char = char
+                            break
+                global _active_ble_clients
+                _active_ble_clients[address] = (client, rx_char)
                 await client.start_notify(NUS_TX_CHAR_UUID, handle_rx)
                 print(f"📥 [BLE] Subscribed to {name} Nordic UART stream. Streaming live...")
 
@@ -347,6 +364,8 @@ async def run_serial_worker(mqtt_client, args):
         try:
             print(f"🔌 [Serial Gateway] Detected microcontroller on {target_port}. Connecting at {args.baud} baud...")
             ser = serial.Serial(target_port, args.baud, timeout=1.0)
+            global _active_serial_conn
+            _active_serial_conn = ser
             await asyncio.sleep(1.0)
             print(f"✅ [Serial Gateway] Connected to Seeed Studio XIAO on {target_port}!")
 
@@ -400,6 +419,7 @@ async def run_serial_worker(mqtt_client, args):
                             "quality": 100
                         }
                         mqtt_client.publish(topic, json.dumps(payload), qos=0)
+                        save_to_sdcard(asset_id, payload)
                         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [USB-SERIAL] [{asset_id} ({asset_name})] VelX: {readings['vibration_x']:.4f} m/s | AccelX: {readings['accel_x']:.2f} m/s² | Temp: {readings['temperature']:.1f} °C | RPM: {readings['rpm']:.0f} | Battery: {readings['battery_pct']}% (12.8 kHz)")
                     except Exception as err:
                         print(f"[SERIAL-WARN] Incomplete packet ({err}): {line_str}")
@@ -435,15 +455,62 @@ def main():
 
     args = parser.parse_args()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"{args.gateway_id}-{args.asset}")
+    import uuid
+    import os
+    random_suffix = uuid.uuid4().hex[:6]
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"{args.gateway_id}-{args.asset or 'gw'}-{random_suffix}")
+
+    def save_to_sdcard(asset_id: str, payload: dict):
+        """Write raw sensor telemetry to local memory card storage mount path"""
+        global _sdcard_storage_enabled, _sdcard_mount_dir
+        if not _sdcard_storage_enabled:
+            return
+        try:
+            today_str = datetime.date.today().isoformat()
+            target_dir = os.path.join(_sdcard_mount_dir, asset_id, today_str)
+            os.makedirs(target_dir, exist_ok=True)
+            log_file = os.path.join(target_dir, "telemetry_stream.jsonl")
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(payload) + "\n")
+        except Exception as e:
+            pass
+
+    def on_control_message(c, userdata, msg):
+        """Handle incoming command messages from backend dashboard to configure sampling rate, duty cycle, etc."""
+        try:
+            topic_parts = msg.topic.split('/')
+            asset_id = topic_parts[1] if len(topic_parts) >= 3 else ""
+            ctrl = json.loads(msg.payload.decode('utf-8'))
+            print(f"📥 [Gateway Control] Received configuration for '{asset_id}': {ctrl}")
+
+            # Send over active USB Serial if matching or generic
+            global _active_serial_conn
+            if _active_serial_conn and _active_serial_conn.is_open:
+                cmd_line = (json.dumps(ctrl) + "\n").encode('utf-8')
+                _active_serial_conn.write(cmd_line)
+                _active_serial_conn.flush()
+                print(f"📡 [USB Control] Forwarded command to Seeed Studio XIAO over USB Serial.")
+
+            # Send over active BLE client if connected
+            global _active_ble_clients
+            for dev_addr, (b_client, b_rx_char) in list(_active_ble_clients.items()):
+                if b_client and b_client.is_connected and b_rx_char:
+                    cmd_bytes = (json.dumps(ctrl) + "\n").encode('utf-8')
+                    asyncio.create_task(b_client.write_gatt_char(b_rx_char, cmd_bytes, response=False))
+                    print(f"📡 [BLE Control] Forwarded command to wireless sensor node {dev_addr}.")
+        except Exception as ex:
+            print(f"⚠️ [Gateway Control Error] Failed to route control message: {ex}")
 
     def on_connect(c, userdata, flags, rc, properties=None):
         if rc == 0:
             print(f"✅ Connected to MQTT Broker at {args.host}:{args.port}")
+            c.subscribe("sensors/+/control")
+            print("Subscribed to control topic: sensors/+/control")
         else:
             print(f"❌ Failed to connect to MQTT broker, return code: {rc}")
 
     client.on_connect = on_connect
+    client.on_message = on_control_message
 
     print(f"🔌 Connecting to MQTT Broker at {args.host}:{args.port}...")
     connected = False

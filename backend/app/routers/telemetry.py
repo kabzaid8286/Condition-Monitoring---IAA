@@ -32,6 +32,12 @@ async def delete_telemetry_snapshot(asset_id: str):
         return {"status": "deleted", "asset_id": asset_id}
     return {"status": "not_found", "asset_id": asset_id}
 
+@router.post("/control/{asset_id}")
+async def send_sensor_control(asset_id: str, payload: Dict[str, Any]):
+    """Send live control configuration (sampling rate, duty cycle, streaming state) to gateway and microcontroller"""
+    success = hub.publish_control(asset_id, payload)
+    return {"status": "dispatched" if success else "failed", "asset_id": asset_id, "config": payload}
+
 @router.get("/live/{asset_id}")
 async def get_live_asset_telemetry(asset_id: str) -> Dict[str, Any]:
     """Get the latest sensor reading for a specific machine"""

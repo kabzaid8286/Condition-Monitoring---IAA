@@ -107,6 +107,17 @@ class TelemetryHub:
         except Exception as e:
             logger.error(f"Error processing MQTT message: {e}")
 
+    def publish_control(self, asset_id: str, command_payload: dict):
+        """Publish control parameters (sampling rate, duty cycle, streaming state) to gateway and sensor node"""
+        if self.mqtt_client and self.mqtt_client.is_connected():
+            topic = f"sensors/{asset_id}/control"
+            payload_str = json.dumps(command_payload)
+            self.mqtt_client.publish(topic, payload_str, qos=1)
+            logger.info(f"Published control command to {topic}: {payload_str}")
+            return True
+        logger.warning("Cannot publish control: MQTT client not connected")
+        return False
+
     def start_mqtt(self, broker_host="localhost", broker_port=1883, loop=None):
         """Initialize and connect MQTT client"""
         self._loop = loop or asyncio.get_event_loop()

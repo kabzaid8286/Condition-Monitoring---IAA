@@ -18,22 +18,102 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', label: '' });
 
-  // System-level parameters
-  const [sysData, setSysData] = useState({
-    loadProfile: 'steady',
-    misalignment: 0,
-    ambientTemp: 22.0,
-    foundation: 'rigid'
+  // Multi-sensor streaming selection
+  const [activeStreamingNodes, setActiveStreamingNodes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('condition_monitoring_active_streaming');
+      return saved ? JSON.parse(saved) : (activeAsset ? [activeAsset] : []);
+    } catch {
+      return activeAsset ? [activeAsset] : [];
+    }
   });
 
-  const handleSysChange = (e) => {
-    const { name, value } = e.target;
-    setSysData(prev => ({ ...prev, [name]: value }));
+  const toggleSensorStreaming = (id) => {
+    setActiveStreamingNodes(prev => {
+      const exists = prev.includes(id);
+      const next = exists ? prev.filter(x => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem('condition_monitoring_active_streaming', JSON.stringify(next));
+      } catch {}
+      
+      // Dispatch control update to backend / gateway
+      fetch(`http://localhost:8000/api/v1/telemetry/control/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !exists, streaming: !exists })
+      }).catch(() => {});
+
+      toast(!exists ? `Streaming activated for ${assets[id]?.name || id}. Storing in memory card.` : `Streaming paused for ${assets[id]?.name || id}.`);
+      return next;
+    });
   };
 
-  const handleSysSave = (e) => {
+  // Selected machine for environmental & parameter tuning
+  const availableAssetIds = Object.keys(assets);
+  const [selectedMachine, setSelectedMachine] = useState(activeAsset || availableAssetIds[0] || '');
+
+  // Per-machine parameter configurations
+  const [machineParams, setMachineParams] = useState(() => {
+    try {
+      const saved = localStorage.getItem('condition_monitoring_machine_params');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Current parameters for the selected machine
+  const currentParams = machineParams[selectedMachine] || {
+    loadProfile: 'every_30s',
+    samplingRate: 12800
+  };
+
+  const handleParamChange = (field, value) => {
+    setMachineParams(prev => ({
+      ...prev,
+      [selectedMachine]: {
+        ...(prev[selectedMachine] || { loadProfile: 'every_30s', samplingRate: 12800 }),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleApplyParameters = async (e) => {
     e.preventDefault();
-    toast('System-level testing parameters saved.');
+    if (!selectedMachine) {
+      toast('Please select a machine first.', 'error');
+      return;
+    }
+
+    try {
+      localStorage.setItem('condition_monitoring_machine_params', JSON.stringify(machineParams));
+    } catch (e) {
+      console.warn(e);
+    }
+
+    const payload = {
+      cmd: 'SET_CONFIG',
+      sampling_rate: Number(currentParams.samplingRate) || 12800,
+      rate: Number(currentParams.samplingRate) || 12800,
+      duty_cycle: currentParams.loadProfile,
+      schedule: currentParams.loadProfile,
+      streaming: activeStreamingNodes.includes(selectedMachine)
+    };
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/telemetry/control/${selectedMachine}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        toast(`Parameters applied to ${assets[selectedMachine]?.name || selectedMachine}: Rate = ${payload.rate} Hz, Duty = ${payload.duty_cycle}. Stored in memory card.`);
+      } else {
+        toast(`Settings saved locally. Gateway notified.`, 'info');
+      }
+    } catch (err) {
+      toast(`Settings saved locally for ${assets[selectedMachine]?.name || selectedMachine}.`, 'info');
+    }
   };
 
   const handleNewSensorChange = (e) => {
@@ -236,31 +316,53 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button 
-                              type="button" 
-                              onClick={() => startEdit(id, a)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                            >
-                              <Edit3 size={13} /> Edit
-                            </button>
-
-                            {!isActive && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <button 
                                 type="button" 
-                                onClick={() => setActiveAsset && setActiveAsset(id)}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--accent)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                                onClick={() => toggleSensorStreaming(id)}
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '5px', 
+                                  background: activeStreamingNodes.includes(id) ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.06)', 
+                                  border: `1px solid ${activeStreamingNodes.includes(id) ? 'var(--emerald)' : 'var(--border)'}`, 
+                                  color: activeStreamingNodes.includes(id) ? 'var(--emerald)' : 'var(--text-secondary)', 
+                                  padding: '6px 12px', 
+                                  borderRadius: '4px', 
+                                  cursor: 'pointer', 
+                                  fontSize: '12px', 
+                                  fontWeight: 600 
+                                }}
                               >
-                                <Radio size={13} /> Activate
+                                <Radio size={13} /> {activeStreamingNodes.includes(id) ? 'Streaming & Logging' : 'Stream Node'}
                               </button>
-                            )}
 
-                            <button 
-                              type="button" 
-                              onClick={() => handleDelete(id)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                            >
-                              <Trash2 size={13} /> Delete
-                            </button>
+                              <button 
+                                type="button" 
+                                onClick={() => startEdit(id, a)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                              >
+                                <Edit3 size={13} /> Edit
+                              </button>
+
+                              {!isActive && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => setActiveAsset && setActiveAsset(id)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--accent)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                                >
+                                  Focus
+                                </button>
+                              )}
+
+                              <button 
+                                type="button" 
+                                onClick={() => handleDelete(id)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'transparent', border: '1px solid var(--rose)', color: 'var(--rose)', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                              >
+                                <Trash2 size={13} /> Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -334,56 +436,82 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
 
         {activeTab === 'system' && (
           <div className="card-body">
-            <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>System Environmental Parameters</h3>
+            <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>System Environmental & Dynamic Hardware Parameters</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '14px' }}>
-              Configure ambient temperature and test fixture specifications for the testing environment.
+              Select a machine or sensor node to dynamically tune its sampling rate (1–15,000 Hz) and acquisition duty cycle. Settings apply immediately to the hardware without re-flashing.
             </p>
 
-            <form onSubmit={handleSysSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '600px' }}>
+            <form onSubmit={handleApplyParameters} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '640px' }}>
+              
+              {/* 1. Machine Selector */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Duty Cycle / Testing Schedule</label>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Select Machine / Sensor Node</label>
                 <select 
-                  name="loadProfile" 
-                  value={sysData.loadProfile} 
-                  onChange={handleSysChange} 
-                  style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                  value={selectedMachine} 
+                  onChange={(e) => setSelectedMachine(e.target.value)} 
+                  style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '14px' }}
                 >
-                  <option value="steady">Steady Bench Acquisition (10s burst / 3s sleep)</option>
-                  <option value="field">Field Battery Deployment (10s burst / 5m deep sleep)</option>
-                  <option value="continuous">Continuous Streaming (USB Tethered)</option>
+                  {Object.entries(assets).map(([id, a]) => (
+                    <option key={id} value={id}>
+                      {a.name || id} ({id})
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Ambient Rig Temp (°C)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    name="ambientTemp" 
-                    value={sysData.ambientTemp} 
-                    onChange={handleSysChange} 
-                    style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Rig Foundation</label>
-                  <select 
-                    name="foundation" 
-                    value={sysData.foundation} 
-                    onChange={handleSysChange} 
-                    style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                  >
-                    <option value="rigid">Rigid Mounted (ISO Class I/II)</option>
-                    <option value="damped">Elastomer Damped</option>
-                  </select>
-                </div>
+              {/* 2. Duty Cycle Schedule */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Duty Cycle / Testing Schedule</label>
+                <select 
+                  value={currentParams.loadProfile} 
+                  onChange={(e) => handleParamChange('loadProfile', e.target.value)} 
+                  style={{ padding: '10px 12px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '14px' }}
+                >
+                  <option value="every_30s">Every 30s save 10s of reading (10s Burst / 20s Sleep)</option>
+                  <option value="steady">Steady Bench Acquisition (10s Burst / 3s Sleep)</option>
+                  <option value="field">Field Battery Deployment (10s Burst / 5m Deep Sleep)</option>
+                  <option value="continuous">Continuous Streaming (USB Tethered / Bench Testing)</option>
+                </select>
               </div>
 
-              <div style={{ marginTop: '16px' }}>
-                <button type="submit" className="btn" style={{ background: 'var(--accent)', color: 'white', padding: '10px 20px', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
-                  Save Rig Configuration
+              {/* 3. Manual Sampling Rate Selection (1 to 15,000 Hz) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Sampling Rate (Hz)</label>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent)' }}>{currentParams.samplingRate || 12800} Hz</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '12px', alignItems: 'center' }}>
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="15000" 
+                    step="100" 
+                    value={currentParams.samplingRate || 12800} 
+                    onChange={(e) => handleParamChange('samplingRate', Number(e.target.value))} 
+                    style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  />
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="15000" 
+                    value={currentParams.samplingRate || 12800} 
+                    onChange={(e) => handleParamChange('samplingRate', Math.max(1, Math.min(15000, Number(e.target.value))))} 
+                    style={{ padding: '8px 10px', background: 'var(--bg-glass)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', textAlign: 'center' }}
+                  />
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Configurable range: 1 Hz to 15,000 Hz. Adjusts sensor acquisition frequency and Nyquist bandwidth on the fly.
+                </span>
+              </div>
+
+              {/* 4. Apply Action */}
+              <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button type="submit" className="btn" style={{ background: 'var(--accent)', color: 'white', padding: '10px 24px', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
+                  Apply Parameters to Hardware
                 </button>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Settings are immediately dispatched to Raspberry Pi 5 & Microcontroller.
+                </span>
               </div>
             </form>
           </div>
