@@ -37,3 +37,4 @@ echo "  sudo cp condition-monitor-gateway.service /etc/systemd/system/"
 echo "  sudo systemctl daemon-reload"
 echo "  sudo systemctl enable --now condition-monitor-gateway"
 echo "=================================================="
+

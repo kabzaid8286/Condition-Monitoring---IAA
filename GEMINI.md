@@ -54,12 +54,22 @@ Develop a complete industrial condition monitoring system for test rigs and rota
   - Pinpointed and wired shared SPI bus architecture (D0=SCK, D1=MOSI, D2=MISO) with dedicated D7 chip select for ADS1220 and D3 for ADXL382.
   - Integrated XIAO nRF54L15 Arduino Core 1.0.22 10-bit battery divider ADC diagnostics on P1.14/P1.15.
   - Enabled direct BLE wireless and USB serial live streaming into dashboard with zero fallback.
+- **Phase 5.9: Dynamic Sampling Rate (1-15k Hz), Duty Cycle Scheduling & SD Card Storage Pipeline (Completed)**:
+  - Dynamic runtime sampling rate slider (1-15,000 Hz) in Test Design view.
+  - Duty cycle schedule options including "Every 30s save 10s of reading" (10s Burst / 20s Sleep).
+  - Multi-sensor simultaneous streaming activation with instantaneous pause/resume toggle.
+  - Bidirectional command parsing in C/C++ sketch without requiring board re-flashing.
+  - Local SD card structured logging hook in gateway (`sdcard_data/<asset_id>/<date>/`).
+  - Debounced toast system eliminating duplicate popup alerts in React StrictMode.
+  - Dynamic sampling rate badge in Overview view header replacing hardcoded 12.8 kHz text.
+  - Prepared Raspberry Pi 5 deployment kit: `gateway/setup_pi.sh`, `gateway/requirements.txt`, and `gateway/condition-monitor-gateway.service`.
 
 ## 4. Current Phase & Next Milestones
-- **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Next Milestone)**:
+- **Phase 5.5: Physical Raspberry Pi 5 Dedicated Gateway Deployment (Active)**:
   - Deploy `gateway/rpi_publisher.py` directly to the physical Raspberry Pi 5 mounted on the test rig.
+  - Connect Raspberry Pi 5 to local network (Ethernet or Wi-Fi).
   - Configure `condition-monitor-gateway.service` as a systemd background daemon on the Pi 5 for headless boot recovery.
-  - The Raspberry Pi 5 ingests BLE from all wireless sensor nodes (e.g. `IAA-xiao-bafdedc8`) and publishes over the local network (LAN / Wi-Fi) to the central MQTT broker (`192.168.0.102:1883`).
+  - The Raspberry Pi 5 ingests BLE from all wireless sensor nodes (e.g. `IAA-xiao-bafdedc8`) and publishes over the local network (LAN / Wi-Fi) to the central MQTT broker (`141.18.210.20:1883`).
   - Completely decouples the Mac from Bluetooth and local gateway processes; dashboard on the Mac (or any LAN device) simply streams live telemetry over WebSocket.
 - **Phase 6: Machine Learning Pipeline (Celery + Redis)**:
   - Implement rolling-window anomaly scoring with LSTM Autoencoders and XGBoost.
