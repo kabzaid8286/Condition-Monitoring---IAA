@@ -1,0 +1,17 @@
+[Unit]
+Description=IAA Condition Monitoring Raspberry Pi 5 Telemetry Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/gateway
+ExecStart=/home/pi/gateway/venv/bin/python3 /home/pi/gateway/rpi_publisher.py --host 141.18.210.20 --port 1883 --mode auto
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
