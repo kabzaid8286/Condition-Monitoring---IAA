@@ -822,13 +822,13 @@ static void emitTelemetryPayload(const char *assetId,
   formatFloat(strAy, sizeof(strAy), ay, 4);
   formatFloat(strTemp, sizeof(strTemp), temp, 1);
 
-  char buf[160];
+  char buf[192];
 
   int n = snprintf(
       buf,
       sizeof(buf),
       "{\"id\":\"%s\",\"name\":\"%s\",\"vx\":%s,\"vy\":%s,"
-      "\"ax\":%s,\"ay\":%s,\"t\":%s,\"rpm\":%d,\"bat\":%d}\n",
+      "\"ax\":%s,\"ay\":%s,\"t\":%s,\"rpm\":%d,\"bat\":%d,\"rate\":%lu}\n",
       assetId,
       assetName,
       strVx,
@@ -837,7 +837,8 @@ static void emitTelemetryPayload(const char *assetId,
       strAy,
       strTemp,
       rpm,
-      battery
+      battery,
+      (unsigned long)s_samplingRateHz
   );
 
   if (n <= 0 || n >= (int)sizeof(buf)) return;

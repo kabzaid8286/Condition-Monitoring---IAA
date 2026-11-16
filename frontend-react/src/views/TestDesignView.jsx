@@ -43,6 +43,13 @@ export default function TestDesignView({ activeAsset, setActiveAsset }) {
         body: JSON.stringify({ active: !exists, streaming: !exists })
       }).catch(() => {});
 
+      if (exists) {
+        // If stopping, also remove from active snapshot immediately so dashboard drops to standby
+        fetch(`http://localhost:8000/api/v1/telemetry/snapshot/${id}`, {
+          method: 'DELETE'
+        }).catch(() => {});
+      }
+
       toast(!exists ? `Streaming activated for ${assets[id]?.name || id}. Storing in memory card.` : `Streaming paused for ${assets[id]?.name || id}.`);
       return next;
     });

@@ -27,6 +27,7 @@ NUS_RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
 # Per-sensor active control & SD storage settings
 _active_streaming_nodes = set()
+_paused_streaming_nodes = set()
 _sdcard_storage_enabled = True
 _sdcard_mount_dir = "sdcard_data"
 _active_serial_conn = None
@@ -274,6 +275,11 @@ async def run_ble_mode(mqtt_client, args):
 
                         asset_id = str(payload_json.get("asset_id") or payload_json.get("id") or args.asset).strip()
                         asset_name = str(payload_json.get("name") or payload_json.get("asset_name") or asset_id.replace("-", " ").title()).strip()
+
+                        # Check if streaming is explicitly paused for this node
+                        global _active_streaming_nodes, _paused_streaming_nodes
+                        if asset_id in _paused_streaming_nodes:
+                            continue
                         if not hasattr(handle_rx, "_logged"):
                             handle_rx._logged = True
                             print(f"🔍 [BLE RAW PACKET] {line}")
@@ -281,7 +287,8 @@ async def run_ble_mode(mqtt_client, args):
                         raw_vy = float(payload_json.get("vibration_y") if payload_json.get("vibration_y") is not None else payload_json.get("vy", payload_json.get("vib_y", 0.0)))
                         explicit_ax = payload_json.get("accel_x") or payload_json.get("ax")
                         explicit_ay = payload_json.get("accel_y") or payload_json.get("ay")
-                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay)
+                        packet_rate = int(payload_json.get("rate") or payload_json.get("sampling_rate") or 12800)
+                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay, sample_rate_hz=packet_rate)
 
                         readings = {
                             "vibration_x": kinematics["vibration_x"],
@@ -405,11 +412,17 @@ async def run_serial_worker(mqtt_client, args):
 
                         asset_id = str(data.get("asset_id") or data.get("id") or args.asset).strip()
                         asset_name = str(data.get("name") or data.get("asset_name") or asset_id.replace('-', ' ').title()).strip()
+
+                        # Check if streaming is explicitly paused for this node
+                        global _active_streaming_nodes, _paused_streaming_nodes
+                        if asset_id in _paused_streaming_nodes:
+                            continue
                         raw_vx = float(data.get("vibration_x") if data.get("vibration_x") is not None else data.get("vx", data.get("vib_x", 0.0)))
                         raw_vy = float(data.get("vibration_y") if data.get("vibration_y") is not None else data.get("vy", data.get("vib_y", 0.0)))
                         explicit_ax = data.get("accel_x") or data.get("ax")
                         explicit_ay = data.get("accel_y") or data.get("ay")
-                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay)
+                        packet_rate = int(data.get("rate") or data.get("sampling_rate") or 12800)
+                        kinematics = process_sensor_kinematics(asset_id, raw_vx, raw_vy, explicit_ax, explicit_ay, sample_rate_hz=packet_rate)
 
                         readings = {
                             "vibration_x": kinematics["vibration_x"],
@@ -486,6 +499,18 @@ def main():
             asset_id = topic_parts[1] if len(topic_parts) >= 3 else ""
             ctrl = json.loads(msg.payload.decode('utf-8'))
             print(f"📥 [Gateway Control] Received configuration for '{asset_id}': {ctrl}")
+
+            # Track per-node active streaming state at the gateway level
+            global _active_streaming_nodes, _paused_streaming_nodes
+            if "streaming" in ctrl:
+                if ctrl["streaming"]:
+                    _paused_streaming_nodes.discard(asset_id)
+                    _active_streaming_nodes.add(asset_id)
+                    print(f"🟢 [Gateway Streaming] Sensor node '{asset_id}' streaming ACTIVE.")
+                else:
+                    _paused_streaming_nodes.add(asset_id)
+                    _active_streaming_nodes.discard(asset_id)
+                    print(f"🔴 [Gateway Streaming] Sensor node '{asset_id}' streaming PAUSED.")
 
             # Send over active USB Serial if matching or generic
             global _active_serial_conn

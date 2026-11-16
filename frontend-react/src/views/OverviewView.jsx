@@ -52,11 +52,12 @@ export default function OverviewView({ kpis = {}, data = {} }) {
   // Only consider offline if burstState is explicitly offline or no telemetry has arrived
   const isOffline = !kpis || kpis?.burstState === 'offline';
   const isResting = !isOffline && parseFloat(kpis?.vibRms || 0) < 0.0005;
+  const currentSamplingRate = kpis?.sampleRateHz || 12800;
 
   return (
     <>
       <div className="page-title">Overview <span className={`badge ${isOffline ? 'warn' : 'blue'}`} style={{fontSize:"11px", fontWeight:500}}>{isOffline ? 'Standby (0 Telemetry)' : (isResting ? 'Live (Resting)' : 'Live')}</span></div>
-      <div className="page-title-sub">Main system status and telemetry {isOffline ? '(Hardware Disconnected — Awaiting Telemetry)' : '(Live Stream Connected • 12.8 kHz Sampling)'}</div>
+      <div className="page-title-sub">Current Sampling Rate: {isOffline ? '0 Hz (Standby)' : `${currentSamplingRate} Hz`}</div>
       
       <div className="overview-grid" style={{marginTop:"20px"}}>
          <KpiCard title="Vibration RMS" value={kpis?.vibRms ?? '0.0000'} unit="m/s" colorClass="blue" icon={<Activity size={18} color="#3b82f6" />} chartData={getSparklineData(vibX, '#3b82f6')} trend={isOffline ? "0.0000 • Hardware Disconnected" : (isResting ? "● Accelerometer (Resting)" : "● Live Accelerometer")} trendClass={isOffline ? "neutral" : "up"} />
