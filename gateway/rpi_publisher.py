@@ -31,6 +31,23 @@ _sdcard_storage_enabled = True
 _sdcard_mount_dir = "sdcard_data"
 _active_serial_conn = None
 _active_ble_clients = {}
+_gateway_event_loop = None
+
+def save_to_sdcard(asset_id: str, payload: dict):
+    """Write raw sensor telemetry to local memory card storage mount path"""
+    global _sdcard_storage_enabled, _sdcard_mount_dir
+    if not _sdcard_storage_enabled:
+        return
+    try:
+        import os
+        today_str = datetime.date.today().isoformat()
+        target_dir = os.path.join(_sdcard_mount_dir, asset_id, today_str)
+        os.makedirs(target_dir, exist_ok=True)
+        log_file = os.path.join(target_dir, "telemetry_stream.jsonl")
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception as e:
+        pass
 
 # Default Configuration
 DEFAULT_BROKER_HOST = "localhost"
@@ -436,6 +453,8 @@ async def run_auto_mode(mqtt_client, args):
     Allows zero-configuration hardware connectivity (cable or battery).
     """
     print("🚀 [Gateway] Starting Auto Dual Mode (USB Serial + BLE Wireless Ingestion)...")
+    global _gateway_event_loop
+    _gateway_event_loop = asyncio.get_running_loop()
     await asyncio.gather(
         run_serial_worker(mqtt_client, args),
         run_ble_mode(mqtt_client, args)
@@ -460,21 +479,6 @@ def main():
     random_suffix = uuid.uuid4().hex[:6]
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"{args.gateway_id}-{args.asset or 'gw'}-{random_suffix}")
 
-    def save_to_sdcard(asset_id: str, payload: dict):
-        """Write raw sensor telemetry to local memory card storage mount path"""
-        global _sdcard_storage_enabled, _sdcard_mount_dir
-        if not _sdcard_storage_enabled:
-            return
-        try:
-            today_str = datetime.date.today().isoformat()
-            target_dir = os.path.join(_sdcard_mount_dir, asset_id, today_str)
-            os.makedirs(target_dir, exist_ok=True)
-            log_file = os.path.join(target_dir, "telemetry_stream.jsonl")
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(payload) + "\n")
-        except Exception as e:
-            pass
-
     def on_control_message(c, userdata, msg):
         """Handle incoming command messages from backend dashboard to configure sampling rate, duty cycle, etc."""
         try:
@@ -492,11 +496,12 @@ def main():
                 print(f"📡 [USB Control] Forwarded command to Seeed Studio XIAO over USB Serial.")
 
             # Send over active BLE client if connected
-            global _active_ble_clients
+            global _active_ble_clients, _gateway_event_loop
             for dev_addr, (b_client, b_rx_char) in list(_active_ble_clients.items()):
                 if b_client and b_client.is_connected and b_rx_char:
                     cmd_bytes = (json.dumps(ctrl) + "\n").encode('utf-8')
-                    asyncio.create_task(b_client.write_gatt_char(b_rx_char, cmd_bytes, response=False))
+                    if _gateway_event_loop and not _gateway_event_loop.is_closed():
+                        asyncio.run_coroutine_threadsafe(b_client.write_gatt_char(b_rx_char, cmd_bytes, response=False), _gateway_event_loop)
                     print(f"📡 [BLE Control] Forwarded command to wireless sensor node {dev_addr}.")
         except Exception as ex:
             print(f"⚠️ [Gateway Control Error] Failed to route control message: {ex}")
