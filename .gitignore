@@ -27,3 +27,4 @@ yarn-error.log*
 
 # Nested duplicate clones if any
 Condition-Monitoring---IAA/
+sdcard_data/
